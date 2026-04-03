@@ -1,67 +1,117 @@
+<div align="center">
 
-# 📦 VTP Tool All-in-One (Chrome Extension)
+<img src="https://via.placeholder.com/800x200/ee0033/ffffff?text=VTP+Tool+All-in-One+-+Chrome+Extension" alt="VTP Tool Banner" width="100%" style="border-radius: 8px;">
 
-> Tiện ích mở rộng mạnh mẽ giúp tự động hóa và tối ưu hóa các quy trình xử lý đơn hàng trên hệ thống Viettel Post, bao gồm việc sửa giờ lấy hàng hàng loạt và quét kiểm kê tồn kho siêu tốc.
+# 📦 VTP Tool All-in-One
+
+*Tiện ích Chrome tối thượng giúp tự động hóa và tối ưu năng suất làm việc trên hệ thống Viettel Post.*
+
+![Version](https://img.shields.io/badge/version-1.0.0-blue.svg?style=flat-square)
+![Platform](https://img.shields.io/badge/platform-Chrome_Extension-green.svg?style=flat-square&logo=google-chrome)
+[![Author](https://img.shields.io/badge/author-Thái_Tân_Dương-red.svg?style=flat-square)](https://github.com/duongthaitan)
+![License](https://img.shields.io/badge/license-MIT-yellow.svg?style=flat-square)
+
+---
+</div>
+
+> **VTP Tool All-in-One** là giải pháp gộp 2 công cụ mạnh mẽ: **Auto Sửa Giờ** và **Auto Kiểm Tồn**, mang đến trải nghiệm mượt mà, giao diện điều khiển 2 Tab trực quan cùng hệ thống thông báo Toast chuyên nghiệp, giúp bạn tiết kiệm hàng giờ đồng hồ mỗi ngày.
+
+## 📑 Mục lục
+- [✨ Tính năng nổi bật](#-tính-năng-nổi-bật)
+- [📸 Giao diện trực quan](#-giao-diện-trực-quan)
+- [🚀 Hướng dẫn cài đặt](#-hướng-dẫn-cài-đặt)
+- [💡 Cẩm nang sử dụng](#-cẩm-nang-sử-dụng)
+- [📂 Cấu trúc mã nguồn](#-cấu-trúc-mã-nguồn)
+- [📞 Liên hệ & Hỗ trợ](#-liên-hệ--hỗ-trợ)
 
 ---
 
 ## ✨ Tính năng nổi bật
 
-Tiện ích được tích hợp giao diện gồm 2 chức năng chính (Tabs):
+| 🕒 TÍNH NĂNG SỬA GIỜ (Tab 1) | 📦 TÍNH NĂNG KIỂM TỒN (Tab 2) |
+| :--- | :--- |
+| **Tự động 100%:** Tự tìm kiếm và cập nhật giờ hẹn lấy (ưu tiên "Ngày kia" / "Ngày mai" / "Cả ngày"). | **Quét siêu tốc:** Điền và quét hàng loạt mã trực tiếp trên DOM, bypass security web. |
+| **Xử lý khối lượng lớn:** Chỉ cần dán hàng chục mã vận đơn, hệ thống tự động lặp đệ quy qua từng mã. | **UI Điều khiển nổi:** Bảng tiến trình Real-time, hiển thị trực tiếp số mã đã quét / tổng mã. |
+| **Chống lag mạng:** Tùy chỉnh `Delay` (độ trễ) tính bằng giây để phù hợp với tốc độ đường truyền. | **Lưu lịch sử & Xuất Excel:** Theo dõi lỗi, xuất ngay file `.csv` làm báo cáo sau khi chạy xong. |
 
-### 🕒 1. Auto Sửa Giờ (Tab 1)
-* **Tự động hóa hoàn toàn:** Tự động tìm kiếm mã vận đơn và cập nhật thời gian hẹn lấy (ưu tiên "Ngày kia" hoặc "Ngày mai" / "Cả ngày").
-* **Xử lý hàng loạt:** Nhận danh sách hàng chục mã vận đơn cùng lúc.
-* **Tùy chỉnh linh hoạt:** Hỗ trợ điều chỉnh thời gian chờ mạng (delay) để tránh tình trạng web phản hồi chậm gây lỗi.
-
-### 📦 2. Auto Kiểm Tồn (Tab 2)
-* **Quét siêu tốc & Bypass Security:** Tự động nhận diện, điền mã và kiểm tra trạng thái đơn hàng trực tiếp trên trang Viettel Post.
-* **Bảng điều khiển thông minh (UI nổi):** Hiển thị thanh tiến trình trực quan, số lượng mã đã quét, và nút tạm dừng/tiếp tục ngay trên màn hình.
-* **Quản lý lịch sử:** Ghi nhận trực tiếp các mã thành công/thất bại và hỗ trợ **xuất file Excel (.csv)** để báo cáo.
-* **Hỗ trợ đa nền tảng:** Tự động nhận diện các tiền tố mã tùy chỉnh (Shopee, Lazada, TikTok, v.v.).
-
-### 🔔 3. Hệ thống Toast Notification
-* Tích hợp hệ thống thông báo dạng pop-up góc màn hình (hiện/tắt tự động) thay thế cho `alert()` truyền thống, mang lại trải nghiệm mượt mà, không gián đoạn thao tác.
-
-
-## 📂 Cấu trúc dự án
-
-
-VTP_All_In_One/
-├── manifest.json            # Cấu hình tiện ích (Manifest V3)
-├── popup.html               # Giao diện điều khiển (2 Tabs)
-├── popup.js                 # Xử lý logic và tiêm script
-├── notification.js          # Hệ thống UI hiển thị thông báo
-├── chinhgio_content.js      # Script xử lý logic sửa giờ lấy hàng
-├── gapton_settings.js       # Script cấu hình tiền tố mã kiểm tồn
-├── gapton_smart_delay.js    # Tối ưu hóa vòng lặp & chống block
-└── gapton_core_scan.js      # Script xử lý logic quét & kiểm kê mã
-
-## 🚀 Hướng dẫn cài đặt
-
-1. Tải toàn bộ mã nguồn về máy và đặt vào một thư mục (VD: `VTP_All_In_One`).
-2. Mở trình duyệt Chrome/Cốc Cốc/Edge và truy cập vào trang quản lý tiện ích: `chrome://extensions/`.
-3. Bật chế độ **Developer mode** (Chế độ dành cho nhà phát triển) ở góc trên bên phải màn hình.
-4. Bấm vào nút **Load unpacked** (Tải tiện ích đã giải nén).
-5. Chọn thư mục `VTP_All_In_One` mà bạn vừa lưu. Lúc này icon của tiện ích sẽ xuất hiện trên thanh công cụ của trình duyệt.
-## 💡 Hướng dẫn sử dụng
-
-### 🔹 Dùng tính năng Sửa Giờ
-1. Bấm vào icon tiện ích trên góc phải trình duyệt.
-2. Tại **Tab Sửa Giờ**, dán danh sách mã vận đơn (mỗi mã 1 dòng).
-3. Thiết lập độ trễ mạng (mặc định 5s, nếu mạng yếu hãy tăng lên).
-4. Bấm **BẮT ĐẦU CHẠY** và để công cụ tự động thao tác.
-
-### 🔹 Dùng tính năng Kiểm Tồn
-1. Mở trang chủ làm việc của **Viettel Post**.
-2. Bấm vào icon tiện ích, chuyển sang **Tab Kiểm Tồn**.
-3. Nút **CHẠY KIỂM TỒN** sẽ sáng lên. Bấm vào nút này.
-4. Tiện ích sẽ ẩn đi và một bảng điều khiển Kiểm kê sẽ hiện lên ở góc dưới bên phải màn hình web. Theo dõi tiến trình tại đây.
-5. *Lưu ý:* Tuyệt đối không thao tác chuột hay bàn phím trong lúc tool đang chạy để tránh làm mất trỏ chuột (focus) của ô nhập mã.
+**🌟 Trải nghiệm chung:**
+Hệ thống **Toast Notification** thông minh tự động bật/tắt ở góc màn hình, thay thế hoàn toàn các hộp thoại `alert()` gây phiền toái.
 
 ---
 
-## 👨‍💻 Tác giả
+## 📸 Giao diện trực quan
 
-Phát triển bởi **[Thái Tân Dương](https://github.com/duongthaitan)**.
-```
+<div align="center">
+  <img src="https://via.placeholder.com/400x300/f0f2f5/ee0033?text=Ảnh+Chụp+Tab+Sửa+Giờ" alt="Tab 1" width="48%">
+  <img src="https://via.placeholder.com/400x300/f0f2f5/ee0033?text=Ảnh+Chụp+Tab+Kiểm+Tồn" alt="Tab 2" width="48%">
+  <p><i>Giao diện Popup chia Tab hiện đại và Bảng điều khiển tiến trình nổi trên màn hình.</i></p>
+</div>
+
+---
+
+## 🚀 Hướng dẫn cài đặt
+
+Bạn không cần phải có kiến thức lập trình để cài đặt. Hãy làm theo 4 bước cực kỳ đơn giản sau:
+
+1. **Tải mã nguồn:** Tải toàn bộ thư mục `VTP_All_In_One` về máy tính của bạn.
+2. **Mở trình quản lý tiện ích:** Truy cập đường dẫn <kbd>chrome://extensions/</kbd> trên Chrome (hoặc <kbd>edge://extensions/</kbd> trên Edge).
+3. **Bật Developer Mode:** Kích hoạt chế độ `Chế độ dành cho nhà phát triển` ở góc trên cùng bên phải.
+4. **Cài đặt:** Nhấn vào nút `Tải tiện ích đã giải nén` (Load unpacked) và chọn thư mục `VTP_All_In_One`.
+   
+🎉 *Hoàn tất! Icon của tiện ích sẽ hiện lên thanh công cụ của bạn.*
+
+---
+
+## 💡 Cẩm nang sử dụng
+
+<details>
+<summary><b>▶ Cách dùng Tab 1: Sửa Giờ</b> (Nhấp để mở rộng)</summary>
+
+1. Mở tiện ích, ở Tab **Sửa Giờ**, dán danh sách mã vận đơn của bạn vào ô trống (Mỗi mã 1 dòng).
+2. Tùy chỉnh **Độ trễ mạng**. Khuyến nghị: `5` giây nếu mạng ổn định, `7-10` giây nếu web Viettel Post đang lag.
+3. Bấm **BẮT ĐẦU CHẠY** và ngồi thưởng thức ly cà phê của bạn ☕.
+4. Nếu có việc gấp, có thể bấm nút **DỪNG LẠI** bất kỳ lúc nào.
+</details>
+
+<details>
+<summary><b>▶ Cách dùng Tab 2: Kiểm Tồn</b> (Nhấp để mở rộng)</summary>
+
+1. Đăng nhập và mở đúng màn hình **làm việc/quản lý đơn hàng** trên trang web của Viettel Post.
+2. Bấm mở tiện ích, chuyển sang Tab **Kiểm Tồn**. Trạng thái sẽ báo `Sẵn sàng`.
+3. Bấm **CHẠY KIỂM TỒN**. Giao diện tiện ích sẽ tự đóng.
+4. Một Bảng điều khiển màu đỏ hiện lên ở góc dưới màn hình. Hệ thống đang tự động làm việc.
+5. ⚠️ **Tuyệt đối không:** Click chuột lung tung hay gõ phím khi quá trình đang chạy để tránh làm mất "Focus" của công cụ nhập mã.
+</details>
+
+---
+
+## 📂 Cấu trúc mã nguồn
+
+Hệ thống được module hóa cao độ để dễ dàng nâng cấp và bảo trì:
+
+<details>
+<summary><b>Xem cây thư mục (Tree)</b></summary>
+
+```text
+VTP_All_In_One/
+├── manifest.json            # File cốt lõi khai báo cấu hình & quyền
+├── popup.html               # Giao diện UI (2 Tabs chuyển đổi)
+├── popup.js                 # Xử lý sự kiện click & tiêm Script
+├── notification.js          # Module tạo Toast Notification đẹp mắt
+├── chinhgio_content.js      # Script chạy đệ quy sửa ngày giờ
+├── gapton_settings.js       # Quản lý mảng tiền tố (Prefix) SHOPEE, VTP...
+├── gapton_smart_delay.js    # Logic chờ web load thông minh (MutationObserver)
+└── gapton_core_scan.js      # Script quét DOM, chèn mã và vẽ UI tiến trình
+</details>
+
+📞 Liên hệ & Hỗ trợ
+Được phát triển bởi Thái Tân Dương.
+Nếu bạn gặp vấn đề hoặc muốn đóng góp ý tưởng phát triển thêm các dự án tương tự (như Auto Fill Extension hoặc Flow Downloader Auto), vui lòng liên hệ:
+
+📧 Email: duongthaitan13@gmail.com
+
+🐙 GitHub: @duongthaitan
+
+<div align="center">
+<i>Nếu bạn thấy công cụ này hữu ích, đừng quên cho dự án một ⭐️ trên GitHub nhé!</i>
+</div>
