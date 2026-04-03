@@ -1,5 +1,4 @@
 
-```markdown
 # 📦 VTP Tool All-in-One (Chrome Extension)
 
 > Tiện ích mở rộng mạnh mẽ giúp tự động hóa và tối ưu hóa các quy trình xử lý đơn hàng trên hệ thống Viettel Post, bao gồm việc sửa giờ lấy hàng hàng loạt và quét kiểm kê tồn kho siêu tốc.
@@ -24,11 +23,10 @@ Tiện ích được tích hợp giao diện gồm 2 chức năng chính (Tabs):
 ### 🔔 3. Hệ thống Toast Notification
 * Tích hợp hệ thống thông báo dạng pop-up góc màn hình (hiện/tắt tự động) thay thế cho `alert()` truyền thống, mang lại trải nghiệm mượt mà, không gián đoạn thao tác.
 
----
 
 ## 📂 Cấu trúc dự án
 
-```text
+
 VTP_All_In_One/
 ├── manifest.json            # Cấu hình tiện ích (Manifest V3)
 ├── popup.html               # Giao diện điều khiển (2 Tabs)
@@ -38,9 +36,6 @@ VTP_All_In_One/
 ├── gapton_settings.js       # Script cấu hình tiền tố mã kiểm tồn
 ├── gapton_smart_delay.js    # Tối ưu hóa vòng lặp & chống block
 └── gapton_core_scan.js      # Script xử lý logic quét & kiểm kê mã
-```
-
----
 
 ## 🚀 Hướng dẫn cài đặt
 
@@ -49,9 +44,6 @@ VTP_All_In_One/
 3. Bật chế độ **Developer mode** (Chế độ dành cho nhà phát triển) ở góc trên bên phải màn hình.
 4. Bấm vào nút **Load unpacked** (Tải tiện ích đã giải nén).
 5. Chọn thư mục `VTP_All_In_One` mà bạn vừa lưu. Lúc này icon của tiện ích sẽ xuất hiện trên thanh công cụ của trình duyệt.
-
----
-
 ## 💡 Hướng dẫn sử dụng
 
 ### 🔹 Dùng tính năng Sửa Giờ
