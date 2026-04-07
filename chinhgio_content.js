@@ -1,64 +1,94 @@
 // ============================================================
 //  VTP Tool – Sửa Giờ Content Script
-//  Fix #1: Guard chống inject nhiều lần gây chạy chồng
+//  v1.1 Fixes:
+//    - waitForElement: fix race condition (clear timeout khi observer thắng sớm)
+//    - MutationObserver options thu hẹp (bỏ characterData + attributes)
+//    - Guard null cho billList trước khi truy cập .length
+//    - Guard kiểm tra isRunning sau await trước khi tăng index
 // ============================================================
 if (window.__VTP_CHINHGIO_RUNNING__) {
-    console.warn("[VTP Sửa Giờ] Script đã đang chạy. Bỏ qua lần inject mới.");
+    console.warn('[VTP Sửa Giờ] Script đã đang chạy. Bỏ qua lần inject mới.');
 } else {
     window.__VTP_CHINHGIO_RUNNING__ = true;
 
-    // Hàm tạo độ trễ tĩnh
+    /** Độ trễ tĩnh */
     const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-    // Hàm chờ phần tử xuất hiện (DOM Polling) - Tối ưu mạng
+    /**
+     * Chờ phần tử DOM xuất hiện.
+     * Fix v1.1: clearTimeout khi observer resolve sớm → tránh timer leak.
+     * MutationObserver chỉ dùng childList+subtree → giảm trigger.
+     */
     const waitForElement = (selector, timeout = 8000) => {
         return new Promise((resolve) => {
-            if (document.querySelector(selector)) {
-                return resolve(document.querySelector(selector));
-            }
+            // Kiểm tra ngay trước khi tạo observer
+            const existing = document.querySelector(selector);
+            if (existing) return resolve(existing);
+
+            let timeoutId = null;
 
             const observer = new MutationObserver(() => {
                 const el = document.querySelector(selector);
                 if (el) {
                     observer.disconnect();
+                    clearTimeout(timeoutId); // ← Fix: clear timer khi observer thắng
                     resolve(el);
                 }
             });
 
-            observer.observe(document.body, { childList: true, subtree: true });
+            observer.observe(document.body, {
+                childList:     true,
+                subtree:       true,
+                characterData: false, // ← Không cần theo dõi text change
+                attributes:    false  // ← Không cần theo dõi attr change
+            });
 
-            setTimeout(() => {
+            timeoutId = setTimeout(() => {
                 observer.disconnect();
                 resolve(null);
             }, timeout);
         });
     };
 
-    // Hàm mô phỏng thao tác gõ phím cho Angular
+    /**
+     * Mô phỏng thao tác gõ phím cho Angular/React input
+     */
     const setInputValue = (inputElement, value) => {
         inputElement.value = value;
-        inputElement.dispatchEvent(new Event('input', { bubbles: true }));
+        inputElement.dispatchEvent(new Event('input',  { bubbles: true }));
         inputElement.dispatchEvent(new Event('change', { bubbles: true }));
     };
 
-    // Fix #4: Chuyển từ đệ quy → vòng lặp while để tránh stack leak với danh sách dài
+    /**
+     * Vòng lặp while chính (không dùng đệ quy để tránh stack overflow)
+     */
     async function runAutomation() {
         while (true) {
-            let data = await chrome.storage.local.get(['billList', 'delay', 'isRunning', 'currentIndex']);
+            const data = await chrome.storage.local.get(
+                ['billList', 'delay', 'isRunning', 'currentIndex']
+            );
 
-            // Kiểm tra điều kiện dừng
+            // Guard: kiểm tra tất cả điều kiện dừng
             if (!data.isRunning) {
-                console.log("[VTP] Đã dừng tự động hóa.");
+                console.log('[VTP] Đã dừng tự động hóa.');
                 break;
             }
-            if (data.currentIndex >= data.billList.length) {
-                window.VTPNotification.show("✅ Đã chạy xong toàn bộ danh sách!", 'success');
+
+            // Guard: billList có thể null nếu storage bị clear giữa chừng
+            if (!data.billList || !Array.isArray(data.billList)) {
+                console.warn('[VTP] billList không hợp lệ, dừng lại.');
                 await chrome.storage.local.set({ isRunning: false });
                 break;
             }
 
-            let currentBill = data.billList[data.currentIndex];
-            let delayMs = data.delay * 1000;
+            if (data.currentIndex >= data.billList.length) {
+                window.VTPNotification.show('✅ Đã chạy xong toàn bộ danh sách!', 'success');
+                await chrome.storage.local.set({ isRunning: false });
+                break;
+            }
+
+            const currentBill = data.billList[data.currentIndex];
+            const delayMs     = (data.delay || 4) * 1000;
 
             console.log(`>>> Đang xử lý (${data.currentIndex + 1}/${data.billList.length}): ${currentBill}`);
 
@@ -66,65 +96,64 @@ if (window.__VTP_CHINHGIO_RUNNING__) {
                 // --- BƯỚC 1: Xử lý kẹt trang ---
                 let searchInput = document.querySelector('input#frm_keyword');
                 if (!searchInput) {
-                    console.log("Không ở trang tìm kiếm, đang thử đóng form...");
-                    let closeBtn = document.querySelector('button.btn-close, .fa-times')?.parentElement;
+                    console.log('[VTP] Không ở trang tìm kiếm, đang thử đóng form...');
+                    const closeBtn = document.querySelector('button.btn-close, .fa-times')?.parentElement;
                     if (closeBtn) closeBtn.click();
                     await sleep(2000);
                     searchInput = await waitForElement('input#frm_keyword', 5000);
                 }
 
-                if (!searchInput) throw new Error("Không tìm thấy ô tìm kiếm mã vận đơn.");
+                if (!searchInput) throw new Error('Không tìm thấy ô tìm kiếm mã vận đơn.');
 
                 // --- BƯỚC 2: Nhập mã và tìm ---
                 setInputValue(searchInput, currentBill);
                 await sleep(500);
-                let searchBtn = document.querySelector('button.btn-viettel i.fa-search')?.parentElement;
+                const searchBtn = document.querySelector('button.btn-viettel i.fa-search')?.parentElement;
                 if (searchBtn) searchBtn.click();
 
                 // --- BƯỚC 3: Mở menu Sửa ---
-                let menuIcon = await waitForElement('i.fa.fa-bars', 10000);
-                if (!menuIcon) throw new Error("Không load được bảng kết quả hoặc mạng quá chậm.");
-
+                const menuIcon = await waitForElement('i.fa.fa-bars', 10000);
+                if (!menuIcon) throw new Error('Không load được bảng kết quả hoặc mạng quá chậm.');
                 menuIcon.click();
                 await sleep(800);
 
-                let editBtn = Array.from(document.querySelectorAll('button.vtp-bill-btn-action span'))
-                                   .find(span => span.innerText.includes('Sửa đơn'));
-                if (!editBtn) throw new Error("Không tìm thấy nút Sửa đơn.");
+                const editBtn = Array.from(document.querySelectorAll('button.vtp-bill-btn-action span'))
+                                     .find(span => span.innerText.includes('Sửa đơn'));
+                if (!editBtn) throw new Error('Không tìm thấy nút Sửa đơn.');
                 editBtn.parentElement.click();
 
                 // --- BƯỚC 4: Thao tác trong form Sửa đơn ---
                 await waitForElement('button.select-down', 10000);
                 await sleep(delayMs);
 
-                let timeSelectBtn = document.querySelector('button.select-down');
+                const timeSelectBtn = document.querySelector('button.select-down');
                 if (timeSelectBtn) timeSelectBtn.click();
                 await sleep(800);
 
-                // Chọn ngày (Ưu tiên ngày kia, rồi đến ngày mai)
-                let labelNgayKia = document.querySelector('label[for="2_apt"]');
-                let labelNgayMai = document.querySelector('label[for="1_apt"]');
-                if (labelNgayKia) {
-                    labelNgayKia.click();
-                } else if (labelNgayMai) {
-                    labelNgayMai.click();
-                }
+                // Ưu tiên ngày kia → ngày mai
+                const labelNgayKia = document.querySelector('label[for="2_apt"]');
+                const labelNgayMai = document.querySelector('label[for="1_apt"]');
+                if (labelNgayKia)      labelNgayKia.click();
+                else if (labelNgayMai) labelNgayMai.click();
                 await sleep(500);
 
-                // Chọn Cả ngày
-                let labelCaNgay = Array.from(document.querySelectorAll('label.lb-time'))
-                                       .find(lbl => lbl.getAttribute('for') === '1_op' && lbl.innerText.includes('Cả ngày'));
+                // Chọn "Cả ngày"
+                const labelCaNgay = Array.from(document.querySelectorAll('label.lb-time'))
+                                         .find(lbl =>
+                                             lbl.getAttribute('for') === '1_op' &&
+                                             lbl.innerText.includes('Cả ngày')
+                                         );
                 if (labelCaNgay) labelCaNgay.click();
                 await sleep(500);
 
                 // --- BƯỚC 5: Cập nhật ---
-                let updateBtn = Array.from(document.querySelectorAll('button.btn-viettel.btn-block'))
-                                     .find(btn => btn.innerText.trim() === 'Cập nhật');
+                const updateBtn = Array.from(document.querySelectorAll('button.btn-viettel.btn-block'))
+                                       .find(btn => btn.innerText.trim() === 'Cập nhật');
                 if (updateBtn) updateBtn.click();
 
-                // Fix #5: Chờ thông minh – đợi form đóng (button.select-down biến mất) thay vì sleep mù 3 giây
+                // Chờ thông minh — đợi form đóng (button.select-down biến mất)
                 let formClosed = false;
-                let waited = 0;
+                let waited     = 0;
                 while (waited < 6000) {
                     await sleep(300);
                     waited += 300;
@@ -133,21 +162,28 @@ if (window.__VTP_CHINHGIO_RUNNING__) {
                         break;
                     }
                 }
-                if (!formClosed) console.warn("[VTP] Form có thể chưa đóng, tiếp tục sang đơn tiếp theo.");
+                if (!formClosed) {
+                    console.warn('[VTP] Form có thể chưa đóng, tiếp tục sang đơn tiếp theo.');
+                }
 
             } catch (error) {
-                console.error("[VTP] Lỗi tại đơn này:", error.message);
+                console.error('[VTP] Lỗi tại đơn này:', error.message);
             }
 
-            // --- LUÔN CHẠY TIẾP – sang đơn kế tiếp ---
-            let currentData = await chrome.storage.local.get(['isRunning', 'currentIndex']);
-            if (!currentData.isRunning) break;
-            await chrome.storage.local.set({ currentIndex: currentData.currentIndex + 1 });
-            await sleep(1000); // Ổn định DOM trước khi bước tiếp
+            // --- LUÔN CHẠY TIẾP — sang đơn kế tiếp ---
+            // Kiểm tra lại isRunning sau await (user có thể bấm Dừng trong lúc chờ)
+            const latestData = await chrome.storage.local.get(['isRunning', 'currentIndex']);
+            if (!latestData.isRunning) {
+                console.log('[VTP] Phát hiện lệnh Dừng, thoát vòng lặp.');
+                break;
+            }
+            await chrome.storage.local.set({ currentIndex: latestData.currentIndex + 1 });
+            await sleep(1000); // Ổn định DOM trước bước tiếp
         }
 
-        // Reset flag khi kết thúc để cho phép chạy lại mà không cần reload trang
+        // Reset flag → cho phép chạy lại mà không cần reload trang
         window.__VTP_CHINHGIO_RUNNING__ = false;
+        console.log('[VTP Sửa Giờ] Kết thúc, flag đã reset.');
     }
 
     runAutomation();
