@@ -16,8 +16,54 @@
         return;
     }
 
-    // Tắt các event jQuery can thiệp vào input
+    // ── BƯỚC 6: Click tab "Bưu phẩm chưa kiểm kê" ──
+    // Mặc định trang scan mở ở tab "Bưu phẩm đã kiểm kê" → phải chuyển sang tab chưa kiểm kê
+    async function switchToUnscannedTab() {
+        // Tìm tất cả các tab button có chứa text "chưa kiểm kê"
+        const allBtns = document.querySelectorAll(
+            '.z-tab, .z-button, button, [class*="tab"], [class*="Tab"]'
+        );
+
+        let targetTab = null;
+        for (const btn of allBtns) {
+            const txt = (btn.innerText || btn.textContent || '').trim();
+            if (txt.includes('chưa kiểm kê') || txt.includes('Chưa kiểm kê') ||
+                txt.includes('chua kiem ke')) {
+                targetTab = btn;
+                break;
+            }
+        }
+
+        if (!targetTab) {
+            console.warn('[VTP Core] Không tìm thấy tab "Bưu phẩm chưa kiểm kê" – tiếp tục với tab hiện tại');
+            return false;
+        }
+
+        console.log('[VTP Core] ✅ Tìm thấy tab chưa kiểm kê:', targetTab.innerText?.trim());
+        targetTab.click();
+
+        // Đợi nội dung tab mới load (tối đa 8 giây, poll mỗi 500ms)
+        const deadline = Date.now() + 8000;
+        while (Date.now() < deadline) {
+            await new Promise(r => setTimeout(r, 500));
+            // Tab đã load xong khi có mã hợp lệ HOẶC có thông báo "Không thấy dữ liệu"
+            const codes   = document.querySelectorAll('.z-listcell-content');
+            const noData  = document.querySelector('.z-label, .z-listitem');
+            if (codes.length > 0 || noData) break;
+        }
+
+        console.log('[VTP Core] Tab chưa kiểm kê đã sẵn sàng');
+        return true;
+    }
+
+    // Chạy bước 6 trước khi kiểm tra mã
+    await switchToUnscannedTab();
+
+    // Tắt các event jQuery can thiệp vào input (sau khi đổi tab vì DOM có thể thay đổi)
     if (typeof $ !== 'undefined') $(inputField).off('cut copy paste keypress');
+
+    // Chờ thêm 1 giây để trang ổn định sau khi đổi tab
+    await new Promise(r => setTimeout(r, 1000));
 
     // ── Lấy danh sách mã hợp lệ trên trang hiện tại ──
     function getValidCodes() {
@@ -51,6 +97,7 @@
         window.VTPNotification.show('Không tìm thấy mã phiếu gửi hợp lệ nào trên màn hình!', 'error');
         return;
     }
+
 
     // ── Xây UI (xóa instance cũ nếu có) ──
     let extUI = document.getElementById('vtp-auto-ext-ui');
