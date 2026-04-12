@@ -128,6 +128,8 @@
     await new Promise(r => setTimeout(r, 800));
 
     // ── Lấy danh sách mã hợp lệ trên trang hiện tại ──
+    // Fix #9: Dùng Set để deduplicate – tránh mã xuất hiện 2+ lần
+    //         (vd: header row + data row của ZK grid render trùng)
     function getValidCodes() {
         const cells        = document.querySelectorAll('.z-listcell-content');
         const validPrefixes = window.VTPSettings
@@ -135,12 +137,16 @@
             : ['SHOPEE', 'VTP', 'VGI', 'PKE', 'KMS', 'PSL', 'TPO'];
 
         const data = [];
+        const seen = new Set(); // Deduplicate: tránh progress tính sai
         cells.forEach(cell => {
             const code = cell.innerText.trim().replace(/\s+/g, '');
-            if (code.length >= 8) {
+            if (code.length >= 8 && !seen.has(code)) {
                 const isStandard = /^[a-zA-Z0-9.\-_\/+]{8,50}$/.test(code);
                 const hasPrefix  = validPrefixes.some(p => code.toUpperCase().startsWith(p));
-                if (isStandard || hasPrefix) data.push({ element: cell, code });
+                if (isStandard || hasPrefix) {
+                    seen.add(code);
+                    data.push({ element: cell, code });
+                }
             }
         });
         return data;

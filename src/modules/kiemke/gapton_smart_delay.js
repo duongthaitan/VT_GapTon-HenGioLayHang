@@ -35,9 +35,8 @@ window.VTPSmartDelay = {
             if (initial === 'success') return resolve(true);
             if (initial === 'error')   return resolve(false);
 
-            // Chỉ quan sát thay đổi về cấu trúc DOM (childList + subtree)
-            // KHÔNG dùng characterData: tránh trigger từ mọi text node nhỏ
-            // KHÔNG dùng attributes: tránh trigger từ style/class animation
+            // Fix #10: Khai báo trước observer để đảm bảo variable luôn in-scope
+            let timeoutId;
             const observer = new MutationObserver((_mutations, obs) => {
                 const status = checkStatus();
                 if (status === 'success') {
@@ -58,7 +57,7 @@ window.VTPSmartDelay = {
                 attributes:    false   // ← Tắt để bỏ qua style/class updates
             });
 
-            const timeoutId = setTimeout(() => {
+            timeoutId = setTimeout(() => {
                 observer.disconnect();
                 resolve(false);
             }, maxWaitTime);
@@ -78,6 +77,8 @@ window.VTPSmartDelay = {
 
             if (checkChanged()) return resolve(true);
 
+            // Fix #10: Khai báo trước observer
+            let timeoutId;
             const observer = new MutationObserver((_mutations, obs) => {
                 if (checkChanged()) {
                     obs.disconnect();
@@ -94,7 +95,7 @@ window.VTPSmartDelay = {
                 attributes:    false
             });
 
-            const timeoutId = setTimeout(() => {
+            timeoutId = setTimeout(() => {
                 observer.disconnect();
                 resolve(false);
             }, maxWait);

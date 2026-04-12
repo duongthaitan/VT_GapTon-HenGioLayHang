@@ -1,13 +1,26 @@
 // ============================================================
 //  VTP Tool – Popup Controller
-//  v1.4 Changes:
-//    - Thêm chức năng chọn tuyến kiểm kê (checklist)
-//    - Load danh sách tuyến từ combobox trên trang VTP
-//    - Sau kiểm kê tuyến (5 bước), tự động inject gapton_core_scan
-//    - Sau scan xong: F5 trang → chờ về trang danh sách → tuyến kế tiếp
-//    - Giữ nguyên chức năng quét mã cũ
+//  v2.1 Changes:
+//    - Fix #1 : Nút Dừng cho Tab Kiểm Kê Tuyến + cancel token
+//    - Fix #2 : Lưu mainTabId trước vòng lặp, dùng get() thay active query
+//    - Fix #3 : Đồng bộ version comment
+//    - Fix #4 : Visual feedback is-running / is-done / is-error trên route items
+//    - Fix #5 : Extract resetBtn() helper
+//    - Fix #6 : Confirm dialog khi chạy >= 3 tuyến
+//    - Fix #7 : ETA / elapsed timer
+//    - Fix #13: aria-selected được cập nhật khi switch tab
+//    - Fix #14: Persist routes qua chrome.storage.session
+//    - Fix #16: pollPageVar cleanup khi tab bị đóng
 // ============================================================
 document.addEventListener('DOMContentLoaded', async () => {
+
+    // Fix #5: Hẳng số HTML cho các nút — tránh copy-paste, tái sử dụng
+    const BTN_HTML = {
+        startPlay:    `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><polygon points="4,2 17,10 4,18"/></svg> Bắt Đầu Chạy`,
+        startRunning: `<svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M21 12a9 9 0 11-3.36-7.02"/></svg> Đang chạy…`,
+        kiemkePlay:   `<svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><polygon points="4 2.5 17 10 4 17.5"/></svg> Chạy Kiểm Kê Tự Động`,
+        kiemkeRun:    `<svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M21 12a9 9 0 11-3.36-7.02"/></svg> Đang kiểm kê...`,
+    };
 
     // ════════════════════════════════════════
     //  TAB SWITCHING + Sliding Indicator
@@ -32,9 +45,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     tabBtns.forEach(btn => {
         btn.addEventListener('click', () => {
-            tabBtns.forEach(b => b.classList.remove('active'));
+            tabBtns.forEach(b => {
+                b.classList.remove('active');
+                b.setAttribute('aria-selected', 'false'); // Fix #13
+            });
             tabContents.forEach(c => c.classList.remove('active'));
             btn.classList.add('active');
+            btn.setAttribute('aria-selected', 'true');   // Fix #13
             document.getElementById(btn.getAttribute('data-target')).classList.add('active');
             updateTabIndicator(btn);
         });
@@ -174,7 +191,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Fix inject trùng: Disable ngay lập tức trước khi inject
         startChinhGioBtn.disabled  = true;
-        startChinhGioBtn.innerHTML = '<svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M21 12a9 9 0 11-3.36-7.02"/></svg> Đang chạy…';
+        startChinhGioBtn.innerHTML = BTN_HTML.startRunning; // Fix #5
 
         await chrome.storage.local.set({
             billList:     bills,
@@ -194,7 +211,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             await chrome.storage.local.set({ isRunning: false });
             // Re-enable nút nếu lỗi
             startChinhGioBtn.disabled  = false;
-            startChinhGioBtn.innerHTML = '<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><polygon points="4,2 17,10 4,18"/></svg> Bắt Đầu Chạy';
+            startChinhGioBtn.innerHTML = BTN_HTML.startPlay; // Fix #5
             alert('Không thể chạy script. Hãy đảm bảo bạn đang mở đúng trang ViettelPost!');
         }
     });
@@ -204,7 +221,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (statusMsg) statusMsg.textContent      = 'Đã dừng.';
         if (statusDot) statusDot.style.background = '#6b7280';
         startChinhGioBtn.disabled  = false;
-        startChinhGioBtn.innerHTML = '<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><polygon points="4,2 17,10 4,18"/></svg> Bắt Đầu Chạy';
+        startChinhGioBtn.innerHTML = BTN_HTML.startPlay; // Fix #5
     });
 
     // ════════════════════════════════════════
@@ -218,12 +235,39 @@ document.addEventListener('DOMContentLoaded', async () => {
     const routeSelectAllCb      = document.getElementById('routeSelectAll');
     const routeCounterEl        = document.getElementById('routeCounter');
     const startKiemKeTuyenBtn   = document.getElementById('startKiemKeTuyenBtn');
+    const cancelKiemKeTuyenBtn  = document.getElementById('cancelKiemKeTuyenBtn'); // Fix #1
     const routeProgressCard     = document.getElementById('routeProgressCard');
     const routeProgressBar      = document.getElementById('routeProgressBar');
     const routeProgressPct      = document.getElementById('routeProgressPct');
     const routeProgressStatus   = document.getElementById('routeProgressStatus');
+    const routeElapsedEl        = document.getElementById('routeElapsedTime');     // Fix #7
+    const routeEtaEl            = document.getElementById('routeEtaTime');         // Fix #7
 
     let loadedRoutes = []; // Danh sách tuyến đã load
+
+    // Fix #4: Visual status của từng route item
+    function setRouteStatus(routeName, status) {
+        const escapedName = routeName.replace(/"/g, '\\"');
+        const cb = routeChecklist.querySelector(`.route-item-cb[data-route="${escapedName}"]`);
+        if (!cb) return;
+        const item = cb.closest('.route-item');
+        if (!item) return;
+        item.classList.remove('is-running', 'is-done', 'is-error');
+
+        // Xoá icon cũ
+        const oldIcon = item.querySelector('.route-status-icon');
+        if (oldIcon) oldIcon.remove();
+
+        if (status === 'waiting') return;
+        item.classList.add(`is-${status}`);
+
+        // Thêm icon tương ứng
+        const iconMap = { running: '⏳', done: '✅', error: '❌' };
+        const icon = document.createElement('span');
+        icon.className = 'route-status-icon';
+        icon.textContent = iconMap[status] || '';
+        item.querySelector('label')?.appendChild(icon);
+    }
 
     function setGapTonStatus(isReady, title, desc) {
         statusBoxGapTon.className = `alert ${isReady ? 'alert-success' : 'alert-warning'}`;
@@ -419,6 +463,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             renderRouteChecklist(routes);
 
+            // Fix #14: Lưu routes vào session storage
+            try {
+                if (chrome.storage.session) {
+                    await chrome.storage.session.set({ vtpLoadedRoutes: routes });
+                }
+            } catch (_) {}
+
         } catch (e) {
             console.error('[VTP] Lỗi load routes:', e);
             alert('Lỗi khi tải danh sách tuyến: ' + e.message);
@@ -434,17 +485,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // ════════════════════════════════════════
-    //  CHẠY KIỂM KÊ TUYẾN
-    //  Luồng mỗi tuyến:
-    //   A) Set __VTP_SELECTED_ROUTE__
-    //   B) Đăng ký waitForScanPage() TRƯỚC khi inject
-    //   C) Inject kiemke_tuyen_auto.js (5 bước)
-    //   D) Chờ trang scan mở (URL change hoặc input.clsinputpg xuất hiện)
-    //   E) Inject gapton_core_scan.js → quét tự động
-    //   F) Poll __VTP_SCAN_COMPLETE__ chờ scan xong
-    //   G) Navigate về trang danh sách → lặp tuyến kế tiếp
-    // ════════════════════════════════════════
+    // Fix #14: Restore từ session storage
+    try {
+        if (chrome.storage.session) {
+            const sessionData = await chrome.storage.session.get(['vtpLoadedRoutes']);
+            if (sessionData.vtpLoadedRoutes?.length > 0) {
+                renderRouteChecklist(sessionData.vtpLoadedRoutes);
+                console.log('[VTP] ↩ Restored', sessionData.vtpLoadedRoutes.length, 'tuyến từ session');
+            }
+        }
+    } catch (_) {}
+
+    // Fix #1: Nút hủy — set cancelToken thông qua global _vtpCancelToken
+    cancelKiemKeTuyenBtn.addEventListener('click', () => {
+        if (window._vtpCancelToken) window._vtpCancelToken.cancelled = true;
+        cancelKiemKeTuyenBtn.disabled = true;
+        routeProgressStatus.textContent = '⏹ Đang dừng sau khi hoàn thành tuyến hiện tại...';
+    });
+
     startKiemKeTuyenBtn.addEventListener('click', async () => {
         let [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         if (!tab?.url?.includes('viettelpost') && !tab?.url?.includes('localhost')) return;
@@ -455,33 +513,88 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
         if (selectedRoutes.length === 0) { alert('Vui lòng chọn ít nhất 1 tuyến!'); return; }
 
-        // Disable UI
-        startKiemKeTuyenBtn.disabled  = true;
-        startKiemKeTuyenBtn.innerHTML = '<svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M21 12a9 9 0 11-3.36-7.02"/></svg> Đang kiểm kê...';
-        loadRoutesBtn.disabled          = true;
-        startGapTonBtn.disabled         = true;
+        // Fix #6: Confirm khi chạy >= 3 tuyến
+        if (selectedRoutes.length >= 3) {
+            const ok = confirm(
+                `Bạn muốn tự động kiểm kê ${selectedRoutes.length} tuyến?\n\n` +
+                `Bắt đầu: ${selectedRoutes[0]}\nKết thúc: ${selectedRoutes[selectedRoutes.length - 1]}\n\n` +
+                `Mỗi tuyến sẽ mất vài phút. Không thao tác khác trong lúc chạy.`
+            );
+            if (!ok) return;
+        }
+
+        // Fix #2: Lưu mainTabId ngay — dùng get() trong vòng lặp thay vì active query
+        const mainTabId = tab.id;
+
+        // Fix #1: Tạo cancel token mới cho lần chạy này
+        window._vtpCancelToken = { cancelled: false };
+        const cancelToken = window._vtpCancelToken;
+
+        // Disable UI, show cancel button
+        startKiemKeTuyenBtn.disabled       = true;
+        startKiemKeTuyenBtn.innerHTML      = BTN_HTML.kiemkeRun;
+        cancelKiemKeTuyenBtn.style.display = 'inline-flex';
+        cancelKiemKeTuyenBtn.disabled      = false;
+        loadRoutesBtn.disabled             = true;
+        startGapTonBtn.disabled            = true;
 
         routeProgressCard.style.display = 'block';
         routeProgressBar.style.width    = '0%';
         routeProgressPct.textContent    = `0 / ${selectedRoutes.length}`;
+        if (routeElapsedEl) routeElapsedEl.textContent = '⏱ 00:00';
+        if (routeEtaEl)     routeEtaEl.textContent     = '';
 
-        let completed = 0;
-        let errors    = [];
+        let completed  = 0;
+        let errors     = [];
+        let elapsedSec = 0;
 
-        // ── Helper: poll biến global trên trang ──
+        // Fix #7: ETA / elapsed timer
+        const elapsedTimer = setInterval(() => {
+            elapsedSec++;
+            const m = String(Math.floor(elapsedSec / 60)).padStart(2, '0');
+            const s = String(elapsedSec % 60).padStart(2, '0');
+            if (routeElapsedEl) routeElapsedEl.textContent = `⏱ ${m}:${s}`;
+            if (completed > 0 && routeEtaEl) {
+                const avgSec = elapsedSec / completed;
+                const remain = selectedRoutes.length - completed;
+                const etaSec = Math.round(avgSec * remain);
+                const em = String(Math.floor(etaSec / 60)).padStart(2, '0');
+                const es = String(etaSec % 60).padStart(2, '0');
+                routeEtaEl.textContent = `~Còn ${em}:${es}`;
+            }
+        }, 1000);
+
+        // ── Helper: poll biến global trên trang (Fix #16: cleanup khi tab bị đóng) ──
         function pollPageVar(tabId, varName, intervalMs, timeoutMs) {
             return new Promise((resolve) => {
                 const start = Date.now();
+                let resolved = false;
+                const tabRemovedListener = (removedTabId) => {
+                    if (removedTabId !== tabId || resolved) return;
+                    resolved = true;
+                    chrome.tabs.onRemoved.removeListener(tabRemovedListener);
+                    console.warn('[VTP] Tab bị đóng — hủy poll');
+                    resolve(null);
+                };
+                chrome.tabs.onRemoved.addListener(tabRemovedListener);
                 const check = async () => {
+                    if (resolved) return;
                     try {
                         const res = await chrome.scripting.executeScript({
                             target: { tabId }, world: 'MAIN',
                             func: (v) => window[v] || null, args: [varName]
                         });
                         const val = res?.[0]?.result;
-                        if (val) { resolve(val); return; }
-                    } catch (_) { /* tab đang navigate – bỏ qua */ }
-                    if (Date.now() - start >= timeoutMs) { resolve(null); return; }
+                        if (val && !resolved) {
+                            resolved = true;
+                            chrome.tabs.onRemoved.removeListener(tabRemovedListener);
+                            resolve(val); return;
+                        }
+                    } catch (_) {}
+                    if (Date.now() - start >= timeoutMs) {
+                        if (!resolved) { resolved = true; chrome.tabs.onRemoved.removeListener(tabRemovedListener); resolve(null); }
+                        return;
+                    }
                     setTimeout(check, intervalMs);
                 };
                 setTimeout(check, intervalMs);
@@ -607,15 +720,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         // ════════════════════════════════════════
         for (let i = 0; i < selectedRoutes.length; i++) {
             const route = selectedRoutes[i];
+
+            // Fix #1: Kiểm tra cancel trước mỗi tuyến
+            if (cancelToken.cancelled) {
+                console.log('[VTP] ⏹ Hủy kiểm kê theo yêu cầu người dùng.');
+                break;
+            }
+
             routeProgressStatus.textContent = `[${i + 1}/${selectedRoutes.length}] Kiểm kê: ${route}`;
+            setRouteStatus(route, 'running'); // Fix #4
 
             try {
-                // A: Làm mới tab reference (tab có thể đã navigate/reload)
-                [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+                // A: Fix #2 — dùng mainTabId, không query theo active
+                tab = await chrome.tabs.get(mainTabId);
 
                 // B: Chờ trang danh sách sẵn sàng (combobox phải xuất hiện)
                 routeProgressStatus.textContent = `[${i + 1}/${selectedRoutes.length}] Chờ trang danh sách sẵn sàng...`;
-                const listReady = await waitForListPageReady(tab.id, 45000);
+                const listReady = await waitForListPageReady(mainTabId, 45000);
                 if (!listReady) {
                     throw new Error('Trang danh sách không load được (timeout 45s). Vui lòng kiểm tra lại!');
                 }
@@ -623,7 +744,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 // C: Set route + clear flags (SAU khi trang sẵn sàng)
                 await chrome.scripting.executeScript({
-                    target: { tabId: tab.id }, world: 'MAIN',
+                    target: { tabId: mainTabId }, world: 'MAIN',
                     func: (name) => {
                         window.__VTP_SELECTED_ROUTE__  = name;
                         window.__VTP_SCAN_COMPLETE__   = null;
@@ -634,22 +755,22 @@ document.addEventListener('DOMContentLoaded', async () => {
                 });
 
                 // D: Lấy URL hiện tại trước khi inject
-                const tabInfo   = await chrome.tabs.get(tab.id);
+                const tabInfo   = await chrome.tabs.get(mainTabId);
                 const urlBefore = tabInfo.url;
                 console.log('[VTP] URL trước inject:', urlBefore);
 
                 // E: Đăng ký waitForScanPage TRƯỚC khi inject
                 routeProgressStatus.textContent = `[${i + 1}/${selectedRoutes.length}] Thực hiện 5 bước: ${route}`;
-                const scanPagePromise = waitForScanPage(tab.id, urlBefore, 90000);
+                const scanPagePromise = waitForScanPage(mainTabId, urlBefore, 90000);
 
                 // F: Inject kiemke_tuyen_auto (5 bước) + đánh dấu đã inject
                 await chrome.scripting.executeScript({
-                    target: { tabId: tab.id }, world: 'MAIN',
+                    target: { tabId: mainTabId }, world: 'MAIN',
                     files: ['src/shared/notification.js', 'src/modules/kiemke/kiemke_tuyen_auto.js']
                 });
                 // Đánh dấu cờ để SPA poller không bị false-positive
                 await chrome.scripting.executeScript({
-                    target: { tabId: tab.id }, world: 'MAIN',
+                    target: { tabId: mainTabId }, world: 'MAIN',
                     func: () => { window.__VTP_5STEPS_INJECTED__ = true; }
                 });
 
@@ -668,29 +789,31 @@ document.addEventListener('DOMContentLoaded', async () => {
                 routeProgressStatus.textContent = `[${i + 1}/${selectedRoutes.length}] Đang quét mã: ${route}`;
                 console.log('[VTP] Inject gapton_core_scan.js...');
                 await chrome.scripting.executeScript({
-                    target: { tabId: tab.id }, world: 'MAIN',
+                    target: { tabId: mainTabId }, world: 'MAIN',
                     files: ['src/shared/notification.js', 'src/modules/kiemke/gapton_settings.js', 'src/modules/kiemke/gapton_smart_delay.js', 'src/modules/kiemke/gapton_core_scan.js']
                 });
 
                 // I: Poll __VTP_SCAN_COMPLETE__ (timeout 30 phút)
                 routeProgressStatus.textContent = `[${i + 1}/${selectedRoutes.length}] Chờ quét xong: ${route}...`;
                 console.log('[VTP] Chờ __VTP_SCAN_COMPLETE__...');
-                const scanDone = await pollPageVar(tab.id, '__VTP_SCAN_COMPLETE__', 3000, 1800000);
-                await clearPageVar(tab.id, '__VTP_SCAN_COMPLETE__');
+                const scanDone = await pollPageVar(mainTabId, '__VTP_SCAN_COMPLETE__', 3000, 1800000);
+                await clearPageVar(mainTabId, '__VTP_SCAN_COMPLETE__');
 
                 if (!scanDone) {
                     console.warn('[VTP] Scan timeout tuyến:', route);
                     errors.push({ route, error: 'Scan timeout' });
+                    setRouteStatus(route, 'error'); // Fix #4
                 } else {
                     console.log('[VTP] ✅ Scan xong:', route);
+                    setRouteStatus(route, 'done');  // Fix #4
                 }
 
                 // J: Navigate về trang danh sách (chuẩn bị cho tuyến tiếp theo)
-                if (i < selectedRoutes.length - 1) {
+                if (i < selectedRoutes.length - 1 && !cancelToken.cancelled) {
                     routeProgressStatus.textContent = `[${i + 1}/${selectedRoutes.length}] Tải lại trang...`;
-                    const reloadPromise = waitForTabReload(tab.id, '', 30000);
+                    const reloadPromise = waitForTabReload(mainTabId, '', 30000);
                     await chrome.scripting.executeScript({
-                        target: { tabId: tab.id }, world: 'MAIN',
+                        target: { tabId: mainTabId }, world: 'MAIN',
                         func: () => {
                             if (location.hostname === 'localhost') {
                                 location.href = '/viettelpost/kiem-ke-buu-pham';
@@ -700,18 +823,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                         }
                     });
                     await reloadPromise;
-                    // Không dùng fixed delay — vòng tiếp theo sẽ waitForListPageReady()
-                    await new Promise(r => setTimeout(r, 1500)); // buffer nhỏ sau reload event
+                    await new Promise(r => setTimeout(r, 1500));
                 }
 
             } catch (e) {
                 console.error(`[VTP] Lỗi tuyến "${route}":`, e);
                 errors.push({ route, error: e.message });
+                setRouteStatus(route, 'error'); // Fix #4
                 // Sau lỗi: thử reload để vòng tiếp theo có trạng thái sạch
                 try {
-                    const reloadPromise = waitForTabReload(tab.id, '', 20000);
+                    const reloadPromise = waitForTabReload(mainTabId, '', 20000);
                     await chrome.scripting.executeScript({
-                        target: { tabId: tab.id }, world: 'MAIN',
+                        target: { tabId: mainTabId }, world: 'MAIN',
                         func: () => location.reload()
                     });
                     await reloadPromise;
@@ -725,25 +848,33 @@ document.addEventListener('DOMContentLoaded', async () => {
             routeProgressBar.style.width = pct + '%';
             routeProgressPct.textContent = `${completed} / ${selectedRoutes.length}`;
 
-            if (i < selectedRoutes.length - 1) {
+            if (i < selectedRoutes.length - 1 && !cancelToken.cancelled) {
                 routeProgressStatus.textContent = `✔️ Xong tuyến ${i + 1}. Chuyển sang tuyến ${i + 2}: ${selectedRoutes[i + 1]}...`;
                 await new Promise(r => setTimeout(r, 1500));
             }
         }
 
-        // Hoàn tất
+        // Hoàn tất — dọn dẹp
+        clearInterval(elapsedTimer); // Fix #7
+        if (routeEtaEl) routeEtaEl.textContent = '';
         routeProgressBar.style.width = '100%';
-        if (errors.length === 0) {
+
+        if (cancelToken.cancelled) {
+            routeProgressStatus.textContent = `⏹ Đã dừng. Hoàn thành ${completed}/${selectedRoutes.length} tuyến.`;
+        } else if (errors.length === 0) {
             routeProgressStatus.textContent = `✅ Hoàn tất! Đã kiểm kê ${completed} tuyến thành công.`;
         } else {
             routeProgressStatus.textContent =
                 `⚠️ Hoàn tất ${completed} tuyến. ${errors.length} lỗi: ${errors.map(e => e.route).join(', ')}`;
         }
 
-        startKiemKeTuyenBtn.disabled  = false;
-        startKiemKeTuyenBtn.innerHTML = '<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><polygon points="4 2.5 17 10 4 17.5"/></svg> Chạy Kiểm Kê Tự Động';
-        loadRoutesBtn.disabled        = false;
-        startGapTonBtn.disabled       = false;
+        // Reset UI
+        startKiemKeTuyenBtn.disabled       = false;
+        startKiemKeTuyenBtn.innerHTML      = BTN_HTML.kiemkePlay; // Fix #5
+        cancelKiemKeTuyenBtn.style.display = 'none';              // Fix #1
+        cancelKiemKeTuyenBtn.disabled      = false;
+        loadRoutesBtn.disabled             = false;
+        startGapTonBtn.disabled            = false;
     });
 
     // ════════════════════════════════════════

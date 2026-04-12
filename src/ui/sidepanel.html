@@ -295,17 +295,29 @@
             <div class="progress-track">
                 <div class="progress-fill red" id="routeProgressBar"></div>
             </div>
+            <div class="progress-meta">
+                <span id="routeElapsedTime" class="progress-elapsed">⏱ 00:00</span>
+                <span id="routeEtaTime" class="progress-eta"></span>
+            </div>
             <div id="routeProgressStatus" class="progress-status-text">Đang chuẩn bị...</div>
         </div>
 
         <!-- CTA Buttons -->
         <div class="cta-group">
-            <button id="startKiemKeTuyenBtn" class="btn btn-primary btn-lg" disabled>
-                <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
-                    <polygon points="4 2.5 17 10 4 17.5"/>
-                </svg>
-                Chạy Kiểm Kê Tự Động
-            </button>
+            <div class="action-btn-row">
+                <button id="startKiemKeTuyenBtn" class="btn btn-primary" style="flex:1" disabled>
+                    <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
+                        <polygon points="4 2.5 17 10 4 17.5"/>
+                    </svg>
+                    Chạy Kiểm Kê Tự Động
+                </button>
+                <button id="cancelKiemKeTuyenBtn" class="btn btn-stop" style="display:none" aria-label="Dừng kiểm kê">
+                    <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
+                        <rect x="3" y="3" width="14" height="14" rx="2"/>
+                    </svg>
+                    Dừng
+                </button>
+            </div>
 
             <div class="divider-or">
                 <span>hoặc quét thủ công</span>
@@ -340,7 +352,11 @@
                 </li>
                 <li>
                     <span class="tip-num">3</span>
-                    Tool thực hiện 6 bước tự động cho mỗi tuyến
+                    Tool tự động chuyển sang tuyến tiếp theo sau khi quét xong
+                </li>
+                <li>
+                    <span class="tip-num">4</span>
+                    Nhấn nút “Dừng” bất cứ lúc nào để hủy sau tuyến hiện tại
                 </li>
             </ul>
         </div>

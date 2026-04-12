@@ -754,14 +754,16 @@ input#delay:focus {
 .btn-load:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* Disabled — all buttons */
+/* Fix #8: Bỏ !important để tránh conflict giữa .btn:disabled và .btn-load:disabled */
 .btn:disabled {
-    opacity: 0.4;
-    cursor: not-allowed !important;
-    transform: none !important;
-    box-shadow: none !important;
-    background: var(--surface-2) !important;
-    border-color: var(--border) !important;
-    color: var(--text-muted) !important;
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+    transform: none;
+    box-shadow: none;
+    background: var(--surface-2);
+    border-color: var(--border);
+    color: var(--text-muted);
 }
 
 /* ────────────────────────────────────────
@@ -932,7 +934,7 @@ input#delay:focus {
 }
 
 .progress-status-text {
-    margin-top: 10px;
+    margin-top: 8px;
     font-size: 12px;
     font-weight: 500;
     color: var(--text-secondary);
@@ -941,6 +943,30 @@ input#delay:focus {
     background: var(--surface-1);
     border-radius: var(--r-sm);
     border: 1px solid var(--border);
+}
+
+/* Fix #7: ETA + elapsed time row */
+.progress-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 8px;
+    margin-bottom: 2px;
+    padding: 0 2px;
+}
+.progress-elapsed {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.3px;
+}
+.progress-eta {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    font-style: italic;
 }
 
 /* ────────────────────────────────────────
@@ -1039,7 +1065,8 @@ input#delay:focus {
 
 /* Route scroll area */
 .route-list {
-    max-height: 210px;
+    /* Fix #15: Responsive height thay vì cứng 210px */
+    max-height: clamp(160px, 38vh, 260px);
     overflow-y: auto;
     margin: 0 -16px;
     padding: 0 16px;
@@ -1065,6 +1092,36 @@ input#delay:focus {
 .route-item:last-child { border-bottom: none; }
 .route-item:hover { background: var(--c-red-50); }
 .route-item.is-checked { background: var(--c-red-50); }
+
+/* Fix #4: Route item status feedback khi đang chạy tiềm kê */
+.route-item.is-running {
+    background: #FFF8E1;
+    border-left: 3px solid var(--c-amber);
+    padding-left: 13px; /* compensate for border */
+    animation: rowPulse 1.6s ease-in-out infinite;
+}
+.route-item.is-done {
+    background: var(--c-green-bg);
+    border-left: 3px solid var(--c-green);
+    padding-left: 13px;
+}
+.route-item.is-error {
+    background: var(--c-red-bg);
+    border-left: 3px solid var(--c-red);
+    padding-left: 13px;
+}
+@keyframes rowPulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.75; }
+}
+
+/* Route item status icon (appended by JS) */
+.route-status-icon {
+    font-size: 14px;
+    flex-shrink: 0;
+    margin-left: auto;
+    padding-left: 6px;
+}
 
 .route-item-text {
     font-size: 13px;
@@ -1109,6 +1166,48 @@ input#delay:focus {
 /* ────────────────────────────────────────
    15. CTA STACK
 ──────────────────────────────────────── */
+/* Fix #1: Action button row (Start + Cancel side by side) */
+.action-btn-row {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+}
+.action-btn-row .btn-primary {
+    padding: 13px 18px;
+    font-size: 14px;
+    letter-spacing: 0.15px;
+}
+
+/* Nut Dung stop button */
+.btn-stop {
+    flex-shrink: 0;
+    padding: 11px 14px;
+    border: 1.5px solid var(--c-red-100);
+    border-radius: var(--r-md);
+    background: var(--surface-0);
+    color: var(--c-red);
+    font-size: 13px;
+    font-weight: 700;
+    font-family: var(--font);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all var(--dur-fast) var(--ease);
+    user-select: none;
+    white-space: nowrap;
+}
+.btn-stop:hover {
+    background: var(--c-red);
+    border-color: var(--c-red-dark);
+    color: #fff;
+    box-shadow: var(--shadow-red);
+    transform: translateY(-1px);
+}
+.btn-stop:active {
+    transform: translateY(0);
+}
+
 .cta-group {
     display: flex;
     flex-direction: column;
@@ -1252,4 +1351,87 @@ input#delay:focus {
     outline: 2.5px solid var(--c-red);
     outline-offset: 2px;
     border-radius: var(--r-xs);
+}
+
+/* ────────────────────────────────────────
+   20. DARK MODE — Fix #11
+   Override design tokens cho chế độ tối
+──────────────────────────────────────── */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --surface-body: #0F1117;
+        --surface-0:    #181C26;
+        --surface-1:    #1E2230;
+        --surface-2:    #252A38;
+        --surface-3:    #2D3245;
+
+        --border:       #2E3448;
+        --border-hover: #3D4560;
+
+        --text-primary:     #E8EBF4;
+        --text-secondary:   #9AA3BD;
+        --text-muted:       #5A6380;
+        --text-placeholder: #3D4560;
+        --text-on-red:      #FFFFFF;
+
+        --c-green-bg:     #042410;
+        --c-green-border: #0A4020;
+        --c-amber-bg:     #1A1200;
+        --c-amber-border: #3D2E00;
+        --c-red-bg:       #1A0008;
+        --c-red-50:       #200010;
+        --c-red-100:      #3A0018;
+        --c-red-200:      #5A0025;
+
+        --shadow-xs: 0 1px 2px rgba(0,0,0,.30);
+        --shadow-sm: 0 1px 3px rgba(0,0,0,.40), 0 1px 2px rgba(0,0,0,.30);
+        --shadow-md: 0 4px 8px rgba(0,0,0,.45), 0 2px 4px rgba(0,0,0,.30);
+        --shadow-lg: 0 12px 24px rgba(0,0,0,.50), 0 4px 8px rgba(0,0,0,.35);
+    }
+
+    /* Header giữ nguyên gradient đỏ — không đổi */
+    .app-header { filter: brightness(0.92); }
+
+    /* Scrollbar tối */
+    ::-webkit-scrollbar-thumb { background: #2E3448; }
+    ::-webkit-scrollbar-thumb:hover { background: #3D4560; }
+
+    /* Bill textarea */
+    .bill-textarea {
+        color: var(--text-primary);
+        background: var(--surface-2);
+        border-color: var(--border);
+    }
+    .bill-textarea:focus { background: var(--surface-1); }
+
+    /* Stepper input */
+    input#delay {
+        background: var(--c-red-bg);
+        border-color: var(--c-red-200);
+    }
+
+    /* Route running state trong dark */
+    .route-item.is-running { background: #1A1200; }
+    .route-item.is-done    { background: #042410; }
+    .route-item.is-error   { background: #1A0008; }
+
+    /* Alert */
+    .alert-warning { background: var(--c-amber-bg); border-color: var(--c-amber-border); }
+    .alert-success { background: var(--c-green-bg); border-color: var(--c-green-border); }
+    .alert-error   { background: var(--c-red-bg);   border-color: var(--c-red-200); }
+
+    /* Tips card */
+    .tips-header { background: var(--c-red-bg); border-color: var(--c-red-200); }
+
+    /* Empty state icon */
+    .empty-icon { background: var(--c-red-bg); border-color: var(--c-red-200); }
+
+    /* Progress fill shimmer giảm opacity */
+    .progress-fill::after { opacity: 0.5; }
+
+    /* Nút dừng dark */
+    .btn-stop {
+        background: var(--surface-1);
+        border-color: var(--c-red-200);
+    }
 }
