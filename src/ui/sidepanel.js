@@ -319,13 +319,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (routes.length === 0) {
             routeChecklist.innerHTML = `
                 <div class="empty-state">
-                    <svg viewBox="0 0 48 48" fill="none" stroke="#D1D5DB" stroke-width="1.5" width="44" height="44">
-                        <rect x="2" y="8" width="28" height="24" rx="3"/>
-                        <path d="M30 14l7.5 0 4 5V32h-11.5V14z"/>
-                        <circle cx="9" cy="36" r="4"/><circle cx="34" cy="36" r="4"/>
-                    </svg>
-                    <p class="empty-title">Không tìm thấy tuyến nào</p>
-                    <p class="empty-hint">Đảm bảo đang ở trang kiểm kê bưu phẩm</p>
+                    <div class="empty-icon">
+                        <svg viewBox="0 0 56 56" fill="none" width="32" height="32">
+                            <rect x="4" y="10" width="30" height="26" rx="4" stroke="var(--red)" stroke-width="1.5" stroke-dasharray="4 2"/>
+                            <path d="M34 16l8 0 5 6V36h-13V16z" stroke="var(--red)" stroke-width="1.5"/>
+                            <circle cx="11" cy="42" r="4.5" stroke="var(--red)" stroke-width="1.5"/>
+                            <circle cx="37" cy="42" r="4.5" stroke="var(--red)" stroke-width="1.5"/>
+                        </svg>
+                    </div>
+                    <p class="empty-title">Chưa có dữ liệu tuyến</p>
+                    <p class="empty-hint">Nhấn "Tải danh sách" để bắt đầu</p>
                 </div>`;
             routeSelectAllWrap.style.display = 'none';
             startKiemKeTuyenBtn.disabled = true;
@@ -339,9 +342,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             const item = document.createElement('div');
             item.className = 'route-item';
             item.innerHTML = `
-                <label class="checkbox-label" style="width:100%;">
-                    <input type="checkbox" class="cb-input route-item-cb" data-index="${idx}" data-route="${route}">
+                <label class="checkbox-label">
+                    <input type="checkbox" class="cb-input route-item-cb" data-index="${idx}" data-route="${route.replace(/"/g, '&quot;')}">
                     <span class="cb-box"></span>
+                    <span class="route-item-num">${idx + 1}</span>
                     <span class="route-item-text">${route}</span>
                 </label>`;
 
