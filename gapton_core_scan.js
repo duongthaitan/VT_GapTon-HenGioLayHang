@@ -13,41 +13,93 @@
     // ── BƯỚC 6: Click tab "Bưu phẩm chưa kiểm kê" ──
     // Phải switch tab TRƯỚC, vì input.clsinputpg chỉ xuất hiện khi ở tab chưa kiểm kê
     // Mặc định trang scan mở ở tab "Bưu phẩm đã kiểm kê" → phải chuyển sang tab chưa kiểm kê
+    //
+    // ZK framework tab structure:
+    //   <ul class="z-tabs-content">
+    //     <li class="z-tab">
+    //       <a class="z-tab-content">
+    //         <span class="z-tab-text" title="Bưu phẩm chưa kiểm kê">...</span>
+    //       </a>
+    //     </li>
+    //   </ul>
+    //
+    // QUAN TRỌNG: Phải click vào <a class="z-tab-content"> hoặc <li class="z-tab">
+    //   KHÔNG được click vào <ul> cha (selector [class*="tab"] match cả <ul>!)
     async function switchToUnscannedTab() {
-        // Tìm tất cả các tab button có chứa text "chưa kiểm kê"
-        const allBtns = document.querySelectorAll(
-            '.z-tab, .z-button, button, [class*="tab"], [class*="Tab"]'
-        );
+        let clickTarget = null;
+        let parentLi    = null;
 
-        let targetTab = null;
-        for (const btn of allBtns) {
-            const txt = (btn.innerText || btn.textContent || '').trim();
-            if (txt.includes('chưa kiểm kê') || txt.includes('Chưa kiểm kê') ||
-                txt.includes('chua kiem ke')) {
-                targetTab = btn;
+        // ── Chiến lược 1 (Chính xác nhất): Tìm <span class="z-tab-text"> có title/text chứa "chưa kiểm kê"
+        const tabTextSpans = document.querySelectorAll('.z-tab-text');
+        for (const span of tabTextSpans) {
+            const title = (span.getAttribute('title') || '').trim();
+            const txt   = (span.textContent || '').trim();
+            if (title.includes('chưa kiểm kê') || txt.includes('chưa kiểm kê') ||
+                title.includes('Chưa kiểm kê') || txt.includes('Chưa kiểm kê')) {
+                // Navigate lên đúng element click được theo cấu trúc ZK
+                const anchor = span.closest('a.z-tab-content') || span.closest('a');
+                parentLi     = span.closest('li.z-tab') || span.closest('li');
+                clickTarget  = anchor || parentLi || span;
                 break;
             }
         }
 
-        if (!targetTab) {
-            console.warn('[VTP Core] Không tìm thấy tab "Bưu phẩm chưa kiểm kê" – tiếp tục với tab hiện tại');
+        // ── Chiến lược 2 (Fallback): Tìm <a class="z-tab-content"> chứa text "chưa kiểm kê"
+        if (!clickTarget) {
+            const tabAnchors = document.querySelectorAll('a.z-tab-content');
+            for (const a of tabAnchors) {
+                const txt = (a.innerText || a.textContent || '').trim();
+                if (txt.includes('chưa kiểm kê') || txt.includes('Chưa kiểm kê')) {
+                    clickTarget = a;
+                    parentLi    = a.closest('li.z-tab') || a.closest('li');
+                    break;
+                }
+            }
+        }
+
+        // ── Chiến lược 3 (Last resort): Tìm <li class="z-tab"> chứa text "chưa kiểm kê"
+        if (!clickTarget) {
+            const tabLis = document.querySelectorAll('li.z-tab');
+            for (const li of tabLis) {
+                const txt = (li.innerText || li.textContent || '').trim();
+                if (txt.includes('chưa kiểm kê') || txt.includes('Chưa kiểm kê')) {
+                    clickTarget = li;
+                    parentLi    = li;
+                    break;
+                }
+            }
+        }
+
+        if (!clickTarget) {
+            console.warn('[VTP Core] ❌ Không tìm thấy tab "Bưu phẩm chưa kiểm kê" – tiếp tục với tab hiện tại');
             return false;
         }
 
-        console.log('[VTP Core] ✅ Tìm thấy tab chưa kiểm kê:', targetTab.innerText?.trim());
-        targetTab.click();
-
-        // Đợi nội dung tab mới load (tối đa 8 giây, poll mỗi 500ms)
-        const deadline = Date.now() + 8000;
-        while (Date.now() < deadline) {
-            await new Promise(r => setTimeout(r, 500));
-            // Tab đã load xong khi có mã hợp lệ HOẶC có thông báo "Không thấy dữ liệu"
-            const codes   = document.querySelectorAll('.z-listcell-content');
-            const noData  = document.querySelector('.z-label, .z-listitem');
-            if (codes.length > 0 || noData) break;
+        // Kiểm tra nếu tab đã được chọn sẵn → không cần click
+        if (parentLi && parentLi.classList.contains('z-tab-selected')) {
+            console.log('[VTP Core] ✅ Tab "Bưu phẩm chưa kiểm kê" đã được chọn sẵn – bỏ qua click');
+            return true;
         }
 
-        console.log('[VTP Core] Tab chưa kiểm kê đã sẵn sàng');
+        console.log('[VTP Core] Clicking tab chưa kiểm kê:', clickTarget.tagName, clickTarget.className);
+        clickTarget.click();
+
+        // Đợi nội dung tab mới load (tối đa 10 giây, poll mỗi 500ms)
+        const deadline = Date.now() + 10000;
+        while (Date.now() < deadline) {
+            await new Promise(r => setTimeout(r, 500));
+
+            // Xác nhận tab đã thực sự chuyển (class z-tab-selected phải ở đúng li)
+            const refreshLi = parentLi || clickTarget.closest('li.z-tab');
+            if (refreshLi && refreshLi.classList.contains('z-tab-selected')) {
+                console.log('[VTP Core] ✅ Tab chưa kiểm kê đã chuyển thành công (z-tab-selected)');
+                // Chờ thêm 1 giây để nội dung tab render xong
+                await new Promise(r => setTimeout(r, 1000));
+                return true;
+            }
+        }
+
+        console.log('[VTP Core] ⚠️ Đã click tab nhưng chưa xác nhận z-tab-selected. Tiếp tục...');
         return true;
     }
 
