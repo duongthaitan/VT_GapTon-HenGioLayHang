@@ -87,7 +87,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const progressBar  = document.getElementById('progressBar');
     const progressText = document.getElementById('progressText');
     const statusDot    = document.querySelector('#statusChinhGio .status-dot');
-    const statusMsg    = document.querySelector('#statusChinhGio .status-msg');
+    const statusMsg    = document.querySelector('#statusChinhGio .status-text');
 
     function updateProgressUI(current, total) {
         if (total > 0) {
@@ -174,7 +174,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Fix inject trùng: Disable ngay lập tức trước khi inject
         startChinhGioBtn.disabled  = true;
-        startChinhGioBtn.innerHTML = '⏳ Đang chạy…';
+        startChinhGioBtn.innerHTML = '<svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M21 12a9 9 0 11-3.36-7.02"/></svg> Đang chạy…';
 
         await chrome.storage.local.set({
             billList:     bills,
@@ -194,7 +194,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             await chrome.storage.local.set({ isRunning: false });
             // Re-enable nút nếu lỗi
             startChinhGioBtn.disabled  = false;
-            startChinhGioBtn.innerHTML = '<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><polygon points="4,2 16,10 4,18"/></svg> Bắt Đầu Chạy';
+            startChinhGioBtn.innerHTML = '<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><polygon points="4,2 17,10 4,18"/></svg> Bắt Đầu Chạy';
             alert('Không thể chạy script. Hãy đảm bảo bạn đang mở đúng trang ViettelPost!');
         }
     });
@@ -204,7 +204,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (statusMsg) statusMsg.textContent      = 'Đã dừng.';
         if (statusDot) statusDot.style.background = '#6b7280';
         startChinhGioBtn.disabled  = false;
-        startChinhGioBtn.innerHTML = '<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><polygon points="4,2 16,10 4,18"/></svg> Bắt Đầu Chạy';
+        startChinhGioBtn.innerHTML = '<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><polygon points="4,2 17,10 4,18"/></svg> Bắt Đầu Chạy';
     });
 
     // ════════════════════════════════════════
@@ -226,10 +226,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     let loadedRoutes = []; // Danh sách tuyến đã load
 
     function setGapTonStatus(isReady, title, desc) {
-        statusBoxGapTon.className                                       = `conn-status ${isReady ? 'ready' : 'not-ready'}`;
-        statusBoxGapTon.querySelector('.conn-icon').textContent          = isReady ? '✅' : '⚠️';
-        statusBoxGapTon.querySelector('.conn-title').textContent         = title;
-        statusBoxGapTon.querySelector('.conn-desc').textContent          = desc;
+        statusBoxGapTon.className = `alert ${isReady ? 'alert-success' : 'alert-warning'}`;
+        statusBoxGapTon.querySelector('.alert-icon').textContent  = isReady ? '✅' : '⚠️';
+        statusBoxGapTon.querySelector('.alert-title').textContent = title;
+        statusBoxGapTon.querySelector('.alert-desc').textContent  = desc;
+        const dot = statusBoxGapTon.querySelector('.alert-pulse');
+        if (dot) dot.style.background = isReady ? 'var(--c-green)' : 'var(--c-amber)';
         startGapTonBtn.disabled      = !isReady;
         loadRoutesBtn.disabled       = !isReady;
     }
@@ -455,7 +457,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Disable UI
         startKiemKeTuyenBtn.disabled  = true;
-        startKiemKeTuyenBtn.innerHTML = '⏳ Đang kiểm kê...';
+        startKiemKeTuyenBtn.innerHTML = '<svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M21 12a9 9 0 11-3.36-7.02"/></svg> Đang kiểm kê...';
         loadRoutesBtn.disabled          = true;
         startGapTonBtn.disabled         = true;
 
@@ -667,7 +669,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         startKiemKeTuyenBtn.disabled  = false;
-        startKiemKeTuyenBtn.innerHTML = '<svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><polygon points="4 2.5 16 10 4 17.5 4 2.5"/></svg> Chạy Kiểm Kê Tự Động';
+        startKiemKeTuyenBtn.innerHTML = '<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><polygon points="4 2.5 17 10 4 17.5"/></svg> Chạy Kiểm Kê Tự Động';
         loadRoutesBtn.disabled        = false;
         startGapTonBtn.disabled       = false;
     });

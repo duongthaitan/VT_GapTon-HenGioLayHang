@@ -3,74 +3,111 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="VTP Tool – Tự động hóa ViettelPost nội bộ">
+    <meta name="description" content="VTP Tool – Tự động hóa nghiệp vụ ViettelPost nội bộ">
     <title>VTP Tool – Bảng Điều Khiển</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,400&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="sidepanel.css">
 </head>
 <body>
 
-<!-- ══════════════════════════════════════════════
-     HEADER — ViettelPost brand stripe
-══════════════════════════════════════════════ -->
+<!-- ═══════════════════════════════════════════
+     HEADER — ViettelPost Brand Red
+═══════════════════════════════════════════ -->
 <header class="app-header" id="appHeader">
-    <div class="header-left">
-        <div class="logo-ring">
-            <img src="icon48.png" alt="VTP" width="30" height="30">
-        </div>
-        <div class="header-brand">
-            <div class="brand-name">
-                <span class="brand-vtp">Viettel</span><span class="brand-post">Post</span>
-                <div class="brand-divider"></div>
-                <span class="brand-tool">AUTO TOOL</span>
+    <div class="header-inner">
+        <div class="header-left">
+            <div class="logo-wrap">
+                <img src="icon48.png" alt="VTP" class="logo-img">
             </div>
-            <div class="brand-sub">Hệ thống tự động hóa nội bộ</div>
+            <div class="header-brand">
+                <div class="brand-name">
+                    <span class="brand-viettel">Viettel</span><span class="brand-post">Post</span>
+                </div>
+                <div class="brand-tagline">Hệ thống tự động hóa nội bộ</div>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="header-badge">
+                <span class="badge-dot"></span>
+                <span class="badge-label">LIVE</span>
+            </div>
+            <div class="ver-tag">v2.1</div>
         </div>
     </div>
-    <div class="header-right">
-        <div class="ver-chip">v2.1</div>
+    <!-- Bottom wave separator -->
+    <div class="header-wave">
+        <svg viewBox="0 0 400 12" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M0 0 Q100 12 200 6 Q300 0 400 8 L400 12 L0 12 Z" fill="var(--surface-body)"/>
+        </svg>
     </div>
 </header>
 
-<!-- ══════════════════════════════════════════════
-     TAB NAVIGATION — Pill style
-══════════════════════════════════════════════ -->
-<nav class="tab-nav" id="tabNav">
-    <div class="tab-track">
-        <button class="tab-btn active" data-target="tab-chinhgio" id="tabBtnChinhGio">
-            <svg class="tab-ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+<!-- ═══════════════════════════════════════════
+     TAB NAVIGATION
+═══════════════════════════════════════════ -->
+<nav class="tab-nav" id="tabNav" role="tablist" aria-label="Chức năng">
+    <button
+        class="tab-btn active"
+        data-target="tab-chinhgio"
+        id="tabBtnChinhGio"
+        role="tab"
+        aria-selected="true"
+        aria-controls="tab-chinhgio">
+        <span class="tab-icon">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" width="16" height="16">
                 <circle cx="10" cy="10" r="8.5"/><polyline points="10 5.5 10 10 13.5 12"/>
             </svg>
-            <span>Sửa Giờ Lấy Hàng</span>
-        </button>
-        <button class="tab-btn" data-target="tab-gapton" id="tabBtnGapTon">
-            <svg class="tab-ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+        </span>
+        <span class="tab-label">Sửa Giờ Lấy Hàng</span>
+    </button>
+    <button
+        class="tab-btn"
+        data-target="tab-gapton"
+        id="tabBtnGapTon"
+        role="tab"
+        aria-selected="false"
+        aria-controls="tab-gapton">
+        <span class="tab-icon">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" width="16" height="16">
                 <path d="M17.5 13.3V6.7a1.7 1.7 0 00-.83-1.44L10.83 1.9a1.7 1.7 0 00-1.66 0L3.33 5.26A1.7 1.7 0 002.5 6.7v6.6a1.7 1.7 0 00.83 1.44l5.84 3.36a1.7 1.7 0 001.66 0l5.84-3.36A1.7 1.7 0 0017.5 13.3z"/>
-                <polyline points="2.73 5.8 10 10 17.27 5.8"/><line x1="10" y1="18.4" x2="10" y2="10"/>
+                <polyline points="2.73 5.8 10 10 17.27 5.8"/>
+                <line x1="10" y1="18.4" x2="10" y2="10"/>
             </svg>
-            <span>Kiểm Kê Tồn Tuyến</span>
-        </button>
-        <div class="tab-indicator" id="tabIndicator"></div>
-    </div>
+        </span>
+        <span class="tab-label">Kiểm Kê Tồn Tuyến</span>
+    </button>
+    <div class="tab-slider" id="tabIndicator" aria-hidden="true"></div>
 </nav>
 
-<!-- ══════════════════════════════════════════════
-     SCROLL CONTAINER
-══════════════════════════════════════════════ -->
+<!-- ═══════════════════════════════════════════
+     MAIN SCROLL AREA
+═══════════════════════════════════════════ -->
 <main class="scroll-main" id="scrollMain">
 
-    <!-- ═══════════════════════
+    <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━
          TAB 1 — SỬA GIỜ LẤY HÀNG
-    ═══════════════════════ -->
-    <section id="tab-chinhgio" class="tab-pane active">
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+    <section
+        id="tab-chinhgio"
+        class="tab-pane active"
+        role="tabpanel"
+        aria-labelledby="tabBtnChinhGio">
+
+        <!-- Section label -->
+        <div class="section-title">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <circle cx="10" cy="10" r="8.5"/><polyline points="10 5.5 10 10 13.5 12"/>
+            </svg>
+            Tự động cập nhật giờ lấy hàng
+        </div>
 
         <!-- Bill Input Card -->
         <div class="card">
-            <div class="card-head">
-                <div class="card-head-left">
-                    <div class="card-ico red">
+            <div class="card-header">
+                <div class="card-header-left">
+                    <div class="card-icon icon-red">
                         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
                             <rect x="3" y="2" width="14" height="16" rx="2"/>
                             <line x1="7" y1="7" x2="13" y2="7"/>
@@ -78,161 +115,203 @@
                             <line x1="7" y1="13" x2="10" y2="13"/>
                         </svg>
                     </div>
-                    <span class="card-title">Mã vận đơn</span>
+                    <div>
+                        <div class="card-title">Danh sách mã vận đơn</div>
+                        <div class="card-subtitle">Dán nhiều mã, mỗi mã một dòng</div>
+                    </div>
                 </div>
-                <span class="bill-badge" id="billCount">0 mã</span>
+                <span class="count-badge" id="billCount">0 mã</span>
             </div>
-            <textarea
-                id="billList"
-                class="bill-textarea"
-                placeholder="Dán mã vận đơn vào đây&#10;Mỗi mã một dòng...">
-            </textarea>
+            <div class="card-body">
+                <textarea
+                    id="billList"
+                    class="bill-textarea"
+                    placeholder="VD: VTP12345678&#10;VTP87654321&#10;..."></textarea>
+            </div>
         </div>
 
-        <!-- Delay Card -->
-        <div class="card card-inline">
-            <div class="inline-left">
-                <div class="card-ico amber">
+        <!-- Delay Setting Card -->
+        <div class="card card-row">
+            <div class="card-row-left">
+                <div class="card-icon icon-amber">
                     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
-                        <circle cx="10" cy="10" r="8.5"/><polyline points="10 5.5 10 10 13.5 12"/>
+                        <circle cx="10" cy="10" r="8.5"/>
+                        <polyline points="10 5.5 10 10 13.5 12"/>
                     </svg>
                 </div>
                 <div>
-                    <div class="inline-label">Độ trễ giữa đơn</div>
-                    <div class="inline-desc">Giây chờ giữa mỗi lần xử lý</div>
+                    <div class="card-title">Độ trễ giữa đơn</div>
+                    <div class="card-subtitle">Giây chờ giữa mỗi lần xử lý</div>
                 </div>
             </div>
             <div class="stepper-group">
-                <button class="stepper" id="delayMinus">−</button>
-                <input type="number" id="delay" value="4" min="1" max="30">
-                <button class="stepper" id="delayPlus">+</button>
+                <button class="stepper-btn" id="delayMinus" aria-label="Giảm">
+                    <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2.5" width="12" height="12">
+                        <line x1="2" y1="7" x2="12" y2="7"/>
+                    </svg>
+                </button>
+                <input type="number" id="delay" value="4" min="1" max="30" aria-label="Giây chờ">
+                <button class="stepper-btn" id="delayPlus" aria-label="Tăng">
+                    <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2.5" width="12" height="12">
+                        <line x1="7" y1="2" x2="7" y2="12"/>
+                        <line x1="2" y1="7" x2="12" y2="7"/>
+                    </svg>
+                </button>
             </div>
         </div>
 
         <!-- Action Buttons -->
         <div class="btn-row">
-            <button id="startChinhGioBtn" class="btn-primary">
-                <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><polygon points="4,2 16,10 4,18"/></svg>
+            <button id="startChinhGioBtn" class="btn btn-primary">
+                <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
+                    <polygon points="4,2 17,10 4,18"/>
+                </svg>
                 Bắt Đầu Chạy
             </button>
-            <button id="stopChinhGioBtn" class="btn-outline">
-                <svg viewBox="0 0 20 20" fill="currentColor" width="12" height="12"><rect x="3" y="3" width="14" height="14" rx="2"/></svg>
+            <button id="stopChinhGioBtn" class="btn btn-outline-red">
+                <svg viewBox="0 0 20 20" fill="currentColor" width="12" height="12">
+                    <rect x="3" y="3" width="14" height="14" rx="2"/>
+                </svg>
                 Dừng
             </button>
         </div>
 
-        <!-- Progress (hidden by default) -->
-        <div class="progress-wrap" id="progressContainer">
-            <div class="progress-meta">
-                <span>Tiến trình xử lý</span>
-                <span id="progressText" class="progress-pct">0 / 0</span>
+        <!-- Progress -->
+        <div class="progress-card" id="progressContainer" style="display:none">
+            <div class="progress-header">
+                <span class="progress-label">
+                    <span class="live-dot"></span>
+                    Đang xử lý
+                </span>
+                <span id="progressText" class="progress-count">0 / 0</span>
             </div>
-            <div class="progress-rail">
-                <div class="progress-bar" id="progressBar"></div>
+            <div class="progress-track">
+                <div class="progress-fill green" id="progressBar"></div>
             </div>
         </div>
 
-        <!-- Status Row -->
-        <div class="status-row" id="statusChinhGio">
-            <span class="status-dot"></span>
-            <span class="status-msg">Sẵn sàng khởi động</span>
+        <!-- Status -->
+        <div class="status-banner" id="statusChinhGio">
+            <span class="status-dot ok"></span>
+            <span class="status-text">Sẵn sàng khởi động</span>
         </div>
 
     </section>
 
-    <!-- ═══════════════════════
+    <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━
          TAB 2 — KIỂM KÊ TỒN TUYẾN
-    ═══════════════════════ -->
-    <section id="tab-gapton" class="tab-pane">
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+    <section
+        id="tab-gapton"
+        class="tab-pane"
+        role="tabpanel"
+        aria-labelledby="tabBtnGapTon">
 
-        <!-- Connection Status -->
-        <div id="statusBoxGapTon" class="conn-status not-ready">
-            <div class="conn-icon-wrap">
-                <div class="conn-icon">⚠️</div>
-            </div>
-            <div class="conn-body">
-                <span class="conn-title">Chưa sẵn sàng</span>
-                <span class="conn-desc">Đang kiểm tra trang ViettelPost...</span>
-            </div>
-            <div class="conn-dot"></div>
+        <!-- Section label -->
+        <div class="section-title">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <path d="M17.5 13.3V6.7a1.7 1.7 0 00-.83-1.44L10.83 1.9a1.7 1.7 0 00-1.66 0L3.33 5.26A1.7 1.7 0 002.5 6.7v6.6a1.7 1.7 0 00.83 1.44l5.84 3.36a1.7 1.7 0 001.66 0l5.84-3.36A1.7 1.7 0 0017.5 13.3z"/>
+            </svg>
+            Kiểm kê tồn bưu phẩm theo tuyến
         </div>
 
-        <!-- Route Picker Card -->
+        <!-- Connection Alert -->
+        <div id="statusBoxGapTon" class="alert alert-warning" role="alert">
+            <div class="alert-icon">⚠️</div>
+            <div class="alert-body">
+                <div class="alert-title">Chưa sẵn sàng</div>
+                <div class="alert-desc">Đang kiểm tra trang ViettelPost...</div>
+            </div>
+            <div class="alert-pulse"></div>
+        </div>
+
+        <!-- Route Card -->
         <div class="card">
-            <div class="card-head">
-                <div class="card-head-left">
-                    <div class="card-ico red">
+            <div class="card-header">
+                <div class="card-header-left">
+                    <div class="card-icon icon-red">
                         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
                             <rect x="1" y="3" width="12" height="10" rx="1.5"/>
                             <path d="M13 6l3 0 2 2.5V13h-5V6z"/>
-                            <circle cx="4.5" cy="15.5" r="2"/><circle cx="15.5" cy="15.5" r="2"/>
+                            <circle cx="4.5" cy="15.5" r="2"/>
+                            <circle cx="15.5" cy="15.5" r="2"/>
                         </svg>
                     </div>
-                    <span class="card-title">Tuyến kiểm kê</span>
+                    <div>
+                        <div class="card-title">Tuyến kiểm kê</div>
+                        <div class="card-subtitle">Chọn tuyến để thực hiện</div>
+                    </div>
                 </div>
-                <span class="count-chip" id="routeCounter">0 tuyến</span>
+                <span class="count-badge red-badge" id="routeCounter">0 tuyến</span>
             </div>
 
-            <!-- Load Button -->
-            <button id="loadRoutesBtn" class="load-btn" disabled>
-                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" width="15" height="15">
-                    <polyline points="19 3.5 19 8.5 14 8.5"/>
-                    <polyline points="1 16.5 1 11.5 6 11.5"/>
-                    <path d="M3 7.5a7.5 7.5 0 0 1 12.19-2.78L19 8.5M1 11.5l3.81 3.78A7.5 7.5 0 0 0 17 12.5"/>
-                </svg>
-                Tải danh sách tuyến từ VTP
-            </button>
-
-            <!-- Select All (hidden until routes loaded) -->
-            <div id="routeSelectAllWrap" class="select-all-row" style="display:none">
-                <label class="checkbox-label">
-                    <input type="checkbox" id="routeSelectAll" class="cb-input">
-                    <span class="cb-box"></span>
-                    <span class="cb-text">Chọn tất cả</span>
-                </label>
-            </div>
-
-            <!-- Route List -->
-            <div id="routeChecklist" class="route-list">
-                <div class="empty-state">
-                    <svg viewBox="0 0 48 48" fill="none" stroke-width="1.5" width="48" height="48">
-                        <rect x="2" y="8" width="28" height="24" rx="3"/>
-                        <path d="M30 14l7.5 0 4 5V32h-11.5V14z"/>
-                        <circle cx="9" cy="36" r="4"/><circle cx="34" cy="36" r="4"/>
+            <div class="card-body">
+                <!-- Load Button -->
+                <button id="loadRoutesBtn" class="btn btn-load" disabled>
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" width="15" height="15">
+                        <polyline points="19 3.5 19 8.5 14 8.5"/>
+                        <polyline points="1 16.5 1 11.5 6 11.5"/>
+                        <path d="M3 7.5a7.5 7.5 0 0 1 12.19-2.78L19 8.5M1 11.5l3.81 3.78A7.5 7.5 0 0 0 17 12.5"/>
                     </svg>
-                    <p class="empty-title">Chưa có dữ liệu tuyến</p>
-                    <p class="empty-hint">Nhấn "Tải danh sách" để bắt đầu</p>
+                    Tải danh sách tuyến từ VTP
+                </button>
+
+                <!-- Select All -->
+                <div id="routeSelectAllWrap" class="select-all-bar" style="display:none">
+                    <label class="check-label">
+                        <input type="checkbox" id="routeSelectAll" class="cb-native">
+                        <span class="cb-custom"></span>
+                        <span class="cb-text">Chọn tất cả</span>
+                    </label>
+                </div>
+
+                <!-- Route List -->
+                <div id="routeChecklist" class="route-list">
+                    <div class="empty-state">
+                        <div class="empty-icon">
+                            <svg viewBox="0 0 56 56" fill="none" width="56" height="56">
+                                <rect x="4" y="10" width="30" height="26" rx="4" stroke="var(--c-red-200)" stroke-width="1.5"/>
+                                <path d="M34 16l8 0 5 6V36h-13V16z" stroke="var(--c-red-200)" stroke-width="1.5"/>
+                                <circle cx="11" cy="42" r="4.5" stroke="var(--c-red-200)" stroke-width="1.5"/>
+                                <circle cx="37" cy="42" r="4.5" stroke="var(--c-red-200)" stroke-width="1.5"/>
+                            </svg>
+                        </div>
+                        <p class="empty-title">Chưa có dữ liệu tuyến</p>
+                        <p class="empty-hint">Nhấn "Tải danh sách" để bắt đầu</p>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Progress Card (hidden until running) -->
+        <!-- Running Progress -->
         <div id="routeProgressCard" class="progress-card" style="display:none">
-            <div class="progress-card-head">
-                <div class="progress-card-label">
-                    <span class="pulse-dot"></span>
+            <div class="progress-header">
+                <span class="progress-label">
+                    <span class="live-dot"></span>
                     Đang kiểm kê
-                </div>
-                <span id="routeProgressPct" class="progress-chip">0 / 0</span>
+                </span>
+                <span id="routeProgressPct" class="progress-count">0 / 0</span>
             </div>
-            <div class="progress-rail">
-                <div class="progress-bar red" id="routeProgressBar"></div>
+            <div class="progress-track">
+                <div class="progress-fill red" id="routeProgressBar"></div>
             </div>
-            <div id="routeProgressStatus" class="progress-status">Đang chuẩn bị...</div>
+            <div id="routeProgressStatus" class="progress-status-text">Đang chuẩn bị...</div>
         </div>
 
         <!-- CTA Buttons -->
-        <div class="cta-stack">
-            <button id="startKiemKeTuyenBtn" class="btn-primary btn-lg" disabled>
-                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" width="16" height="16">
-                    <polygon points="4 2.5 16 10 4 17.5 4 2.5" fill="currentColor" stroke="none"/>
+        <div class="cta-group">
+            <button id="startKiemKeTuyenBtn" class="btn btn-primary btn-lg" disabled>
+                <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
+                    <polygon points="4 2.5 17 10 4 17.5"/>
                 </svg>
                 Chạy Kiểm Kê Tự Động
             </button>
 
-            <div class="or-divider"><span>hoặc quét thủ công</span></div>
+            <div class="divider-or">
+                <span>hoặc quét thủ công</span>
+            </div>
 
-            <button id="startGapTonBtn" class="btn-ghost-red" disabled>
+            <button id="startGapTonBtn" class="btn btn-secondary" disabled>
                 <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" width="15" height="15">
                     <path d="M17.5 13.3V6.7a1.7 1.7 0 00-.83-1.44L10.83 1.9a1.7 1.7 0 00-1.66 0L3.33 5.26A1.7 1.7 0 002.5 6.7v6.6a1.7 1.7 0 00.83 1.44l5.84 3.36a1.7 1.7 0 001.66 0l5.84-3.36A1.7 1.7 0 0017.5 13.3z"/>
                 </svg>
@@ -240,20 +319,29 @@
             </button>
         </div>
 
-        <!-- Tips -->
+        <!-- Usage Tips -->
         <div class="tips-card">
-            <div class="tips-head">
-                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13">
+            <div class="tips-header">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                     <circle cx="10" cy="10" r="8.5"/>
-                    <line x1="10" y1="6.5" x2="10" y2="10"/>
-                    <circle cx="10" cy="13" r="0.8" fill="currentColor"/>
+                    <line x1="10" y1="6.5" x2="10" y2="10.5"/>
+                    <circle cx="10" cy="13.5" r="0.9" fill="currentColor"/>
                 </svg>
-                Lưu ý sử dụng
+                Lưu ý quan trọng
             </div>
             <ul class="tips-list">
-                <li>Mở trang ViettelPost trước khi sử dụng tool</li>
-                <li>Không thao tác chuột / bàn phím khi đang chạy</li>
-                <li>Tool thực hiện 6 bước tự động cho mỗi tuyến</li>
+                <li>
+                    <span class="tip-num">1</span>
+                    Mở trang ViettelPost trước khi sử dụng tool
+                </li>
+                <li>
+                    <span class="tip-num">2</span>
+                    Không thao tác chuột / bàn phím khi đang chạy
+                </li>
+                <li>
+                    <span class="tip-num">3</span>
+                    Tool thực hiện 6 bước tự động cho mỗi tuyến
+                </li>
             </ul>
         </div>
 
@@ -261,13 +349,15 @@
 
 </main>
 
-<!-- ══════════════════════════════════════════════
+<!-- ═══════════════════════════════════════════
      FOOTER
-══════════════════════════════════════════════ -->
+═══════════════════════════════════════════ -->
 <footer class="app-footer">
-    <span class="footer-text">Built with</span>
-    <span class="footer-heart">♥</span>
-    <span class="footer-text">bởi ViettelPost Automation Team</span>
+    <div class="footer-inner">
+        <span class="footer-copy">Phát triển bởi</span>
+        <span class="footer-brand">ViettelPost Automation</span>
+        <span class="footer-heart" aria-hidden="true">♥</span>
+    </div>
 </footer>
 
 <script src="popup.js"></script>
