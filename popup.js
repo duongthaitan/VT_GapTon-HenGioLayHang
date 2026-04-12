@@ -10,10 +10,25 @@
 document.addEventListener('DOMContentLoaded', async () => {
 
     // ════════════════════════════════════════
-    //  TAB SWITCHING
+    //  TAB SWITCHING + Sliding Indicator
     // ════════════════════════════════════════
     const tabBtns     = document.querySelectorAll('.tab-btn');
     const tabContents = document.querySelectorAll('.tab-pane');
+    const tabIndicator = document.getElementById('tabIndicator');
+
+    function updateTabIndicator(activeBtn) {
+        if (!tabIndicator || !activeBtn) return;
+        const track = activeBtn.closest('.tab-track');
+        if (!track) return;
+        const trackRect = track.getBoundingClientRect();
+        const btnRect   = activeBtn.getBoundingClientRect();
+        tabIndicator.style.width  = btnRect.width + 'px';
+        tabIndicator.style.transform = `translateX(${btnRect.left - trackRect.left - 3}px)`;
+    }
+
+    // Init indicator position
+    const initActiveBtn = document.querySelector('.tab-btn.active');
+    requestAnimationFrame(() => updateTabIndicator(initActiveBtn));
 
     tabBtns.forEach(btn => {
         btn.addEventListener('click', () => {
@@ -21,6 +36,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             tabContents.forEach(c => c.classList.remove('active'));
             btn.classList.add('active');
             document.getElementById(btn.getAttribute('data-target')).classList.add('active');
+            updateTabIndicator(btn);
         });
     });
 
@@ -680,7 +696,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        window.close();
+        // Side panel không đóng được bằng window.close()
+        // Tool đã inject thành công, người dùng có thể tiếp tục xem trạng thái
+        startGapTonBtn.innerHTML = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" width="15" height="15"><path d="M17.5 13.3V6.7a1.7 1.7 0 00-.83-1.44L10.83 1.9a1.7 1.7 0 00-1.66 0L3.33 5.26A1.7 1.7 0 002.5 6.7v6.6a1.7 1.7 0 00.83 1.44l5.84 3.36a1.7 1.7 0 001.66 0l5.84-3.36A1.7 1.7 0 0017.5 13.3z"/></svg> ✅ Đã nạp script!';
+        setTimeout(() => {
+            startGapTonBtn.disabled  = false;
+            startGapTonBtn.innerHTML = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" width="15" height="15"><path d="M17.5 13.3V6.7a1.7 1.7 0 00-.83-1.44L10.83 1.9a1.7 1.7 0 00-1.66 0L3.33 5.26A1.7 1.7 0 002.5 6.7v6.6a1.7 1.7 0 00.83 1.44l5.84 3.36a1.7 1.7 0 001.66 0l5.84-3.36A1.7 1.7 0 0017.5 13.3z"/></svg> Quét Mã Kiểm Tồn';
+        }, 3000);
     });
 
 });
