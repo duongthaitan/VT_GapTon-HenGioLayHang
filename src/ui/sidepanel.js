@@ -498,9 +498,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             } catch (_) {}
         }
 
-        // ♥ HELPER MỚI: chờ trang scan mở (hỗ trợ cả full-nav và SPA)
+        // ♥ HELPER: chờ trang scan mở (hỗ trợ cả full-nav và SPA)
         //   • Full-nav: URL thay đổi và tab status = complete
         //   • SPA     : URL giữ nguyên nhưng input.clsinputpg xuất hiện
+        //
+        // FIX BUG: SPA poller phải kiểm tra __VTP_5STEPS_INJECTED__ = true
+        //   để tránh false-positive khi trang vừa reload và input.clsinputpg
+        //   xuất hiện TRƯỚC khi script 5 bước thực sự bắt đầu chạy.
         function waitForScanPage(tabId, urlBefore, timeoutMs = 90000) {
             return new Promise((resolve) => {
                 let done = false;
@@ -525,18 +529,58 @@ document.addEventListener('DOMContentLoaded', async () => {
                 chrome.tabs.onUpdated.addListener(navListener);
 
                 // Chế độ 2: SPA – poll input.clsinputpg
+                // PHẢI kiểm tra __VTP_5STEPS_INJECTED__ để đảm bảo script
+                // 5 bước đã chạy (tránh nhận nhầm input từ trang reload cũ)
                 const spaPoller = setInterval(async () => {
                     try {
                         const res = await chrome.scripting.executeScript({
                             target: { tabId }, world: 'MAIN',
-                            func: () => !!document.querySelector('input.clsinputpg')
+                            func: () => {
+                                // Chỉ accept nếu script 5 bước đã inject và chạy
+                                const injected = !!window.__VTP_5STEPS_INJECTED__;
+                                const hasInput = !!document.querySelector('input.clsinputpg');
+                                return injected && hasInput;
+                            }
                         });
                         if (res?.[0]?.result === true) {
-                            console.log('[VTP] ♥ SPA: input.clsinputpg xuất hiện');
+                            console.log('[VTP] ♥ SPA: 5 bước đã inject + input.clsinputpg xuất hiện');
                             finish(true);
                         }
                     } catch (_) {} // tab đang navigate
                 }, 1200);
+            });
+        }
+
+        // ♥ HELPER: chờ trang danh sách (sau reload) sẵn sàng
+        //   Điều kiện: combobox .z-combobox xuất hiện VÀ không có loading indicator
+        function waitForListPageReady(tabId, timeoutMs = 45000) {
+            return new Promise((resolve) => {
+                const start = Date.now();
+                const poller = setInterval(async () => {
+                    try {
+                        const res = await chrome.scripting.executeScript({
+                            target: { tabId }, world: 'MAIN',
+                            func: () => {
+                                const hasCombobox = document.querySelectorAll('.z-combobox').length > 0;
+                                const loading = document.querySelector('.z-loading-indicator, .z-apply-loading-indicator');
+                                const isLoading = loading && loading.style.display !== 'none';
+                                return hasCombobox && !isLoading;
+                            }
+                        });
+                        if (res?.[0]?.result === true) {
+                            clearInterval(poller);
+                            resolve(true);
+                        } else if (Date.now() - start >= timeoutMs) {
+                            clearInterval(poller);
+                            resolve(false);
+                        }
+                    } catch (_) {
+                        if (Date.now() - start >= timeoutMs) {
+                            clearInterval(poller);
+                            resolve(false);
+                        }
+                    }
+                }, 800);
             });
         }
 
@@ -566,33 +610,50 @@ document.addEventListener('DOMContentLoaded', async () => {
             routeProgressStatus.textContent = `[${i + 1}/${selectedRoutes.length}] Kiểm kê: ${route}`;
 
             try {
-                // A: Set route + clear flags
+                // A: Làm mới tab reference (tab có thể đã navigate/reload)
+                [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+                // B: Chờ trang danh sách sẵn sàng (combobox phải xuất hiện)
+                routeProgressStatus.textContent = `[${i + 1}/${selectedRoutes.length}] Chờ trang danh sách sẵn sàng...`;
+                const listReady = await waitForListPageReady(tab.id, 45000);
+                if (!listReady) {
+                    throw new Error('Trang danh sách không load được (timeout 45s). Vui lòng kiểm tra lại!');
+                }
+                console.log(`[VTP] ✅ Trang danh sách sẵn sàng cho tuyến: ${route}`);
+
+                // C: Set route + clear flags (SAU khi trang sẵn sàng)
                 await chrome.scripting.executeScript({
                     target: { tabId: tab.id }, world: 'MAIN',
                     func: (name) => {
-                        window.__VTP_SELECTED_ROUTE__ = name;
-                        window.__VTP_SCAN_COMPLETE__  = null;
-                        window.__VTP_5STEPS_DONE__    = null;
+                        window.__VTP_SELECTED_ROUTE__  = name;
+                        window.__VTP_SCAN_COMPLETE__   = null;
+                        window.__VTP_5STEPS_DONE__     = null;
+                        window.__VTP_5STEPS_INJECTED__ = null; // Reset cờ guard SPA
                     },
                     args: [route]
                 });
 
-                // B: Lấy URL hiện tại trước khi inject
+                // D: Lấy URL hiện tại trước khi inject
                 const tabInfo   = await chrome.tabs.get(tab.id);
                 const urlBefore = tabInfo.url;
                 console.log('[VTP] URL trước inject:', urlBefore);
 
-                // C: Đăng ký waitForScanPage TRƯỚC khi inject
+                // E: Đăng ký waitForScanPage TRƯỚC khi inject
                 routeProgressStatus.textContent = `[${i + 1}/${selectedRoutes.length}] Thực hiện 5 bước: ${route}`;
                 const scanPagePromise = waitForScanPage(tab.id, urlBefore, 90000);
 
-                // D: Inject kiemke_tuyen_auto (5 bước)
+                // F: Inject kiemke_tuyen_auto (5 bước) + đánh dấu đã inject
                 await chrome.scripting.executeScript({
                     target: { tabId: tab.id }, world: 'MAIN',
                     files: ['src/shared/notification.js', 'src/modules/kiemke/kiemke_tuyen_auto.js']
                 });
+                // Đánh dấu cờ để SPA poller không bị false-positive
+                await chrome.scripting.executeScript({
+                    target: { tabId: tab.id }, world: 'MAIN',
+                    func: () => { window.__VTP_5STEPS_INJECTED__ = true; }
+                });
 
-                // E: Chờ trang scan mở (URL change hoặc SPA input.clsinputpg)
+                // G: Chờ trang scan mở (URL change hoặc SPA input.clsinputpg)
                 routeProgressStatus.textContent = `[${i + 1}/${selectedRoutes.length}] Chờ trang kiểm kê mở...`;
                 const scanPageReady = await scanPagePromise;
                 if (!scanPageReady) {
@@ -603,7 +664,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // Buffer nhỏ để trang render đầy đủ
                 await new Promise(r => setTimeout(r, 2500));
 
-                // F: Inject gapton_core_scan
+                // H: Inject gapton_core_scan
                 routeProgressStatus.textContent = `[${i + 1}/${selectedRoutes.length}] Đang quét mã: ${route}`;
                 console.log('[VTP] Inject gapton_core_scan.js...');
                 await chrome.scripting.executeScript({
@@ -611,7 +672,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     files: ['src/shared/notification.js', 'src/modules/kiemke/gapton_settings.js', 'src/modules/kiemke/gapton_smart_delay.js', 'src/modules/kiemke/gapton_core_scan.js']
                 });
 
-                // G: Poll __VTP_SCAN_COMPLETE__ (timeout 30 phút)
+                // I: Poll __VTP_SCAN_COMPLETE__ (timeout 30 phút)
                 routeProgressStatus.textContent = `[${i + 1}/${selectedRoutes.length}] Chờ quét xong: ${route}...`;
                 console.log('[VTP] Chờ __VTP_SCAN_COMPLETE__...');
                 const scanDone = await pollPageVar(tab.id, '__VTP_SCAN_COMPLETE__', 3000, 1800000);
@@ -624,27 +685,38 @@ document.addEventListener('DOMContentLoaded', async () => {
                     console.log('[VTP] ✅ Scan xong:', route);
                 }
 
-                // H: Navigate về trang danh sách
-                routeProgressStatus.textContent = `[${i + 1}/${selectedRoutes.length}] Tải lại trang...`;
-                const reloadPromise = waitForTabReload(tab.id, '', 30000);
-                await chrome.scripting.executeScript({
-                    target: { tabId: tab.id }, world: 'MAIN',
-                    func: () => {
-                        // Mock localhost: navigate về trang danh sách
-                        if (location.hostname === 'localhost') {
-                            location.href = '/viettelpost/kiem-ke-buu-pham';
-                        } else {
-                            // VTP thật (SPA): reload cả trang
-                            location.reload();
+                // J: Navigate về trang danh sách (chuẩn bị cho tuyến tiếp theo)
+                if (i < selectedRoutes.length - 1) {
+                    routeProgressStatus.textContent = `[${i + 1}/${selectedRoutes.length}] Tải lại trang...`;
+                    const reloadPromise = waitForTabReload(tab.id, '', 30000);
+                    await chrome.scripting.executeScript({
+                        target: { tabId: tab.id }, world: 'MAIN',
+                        func: () => {
+                            if (location.hostname === 'localhost') {
+                                location.href = '/viettelpost/kiem-ke-buu-pham';
+                            } else {
+                                location.reload();
+                            }
                         }
-                    }
-                });
-                await reloadPromise;
-                await new Promise(r => setTimeout(r, 3000));
+                    });
+                    await reloadPromise;
+                    // Không dùng fixed delay — vòng tiếp theo sẽ waitForListPageReady()
+                    await new Promise(r => setTimeout(r, 1500)); // buffer nhỏ sau reload event
+                }
 
             } catch (e) {
                 console.error(`[VTP] Lỗi tuyến "${route}":`, e);
                 errors.push({ route, error: e.message });
+                // Sau lỗi: thử reload để vòng tiếp theo có trạng thái sạch
+                try {
+                    const reloadPromise = waitForTabReload(tab.id, '', 20000);
+                    await chrome.scripting.executeScript({
+                        target: { tabId: tab.id }, world: 'MAIN',
+                        func: () => location.reload()
+                    });
+                    await reloadPromise;
+                    await new Promise(r => setTimeout(r, 1500));
+                } catch (_) {}
             }
 
             // Cập nhật progress
@@ -654,8 +726,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             routeProgressPct.textContent = `${completed} / ${selectedRoutes.length}`;
 
             if (i < selectedRoutes.length - 1) {
-                routeProgressStatus.textContent = `✔️ Xong tuyến ${i + 1}. Chuyển tuyến ${i + 2}...`;
-                await new Promise(r => setTimeout(r, 2000));
+                routeProgressStatus.textContent = `✔️ Xong tuyến ${i + 1}. Chuyển sang tuyến ${i + 2}: ${selectedRoutes[i + 1]}...`;
+                await new Promise(r => setTimeout(r, 1500));
             }
         }
 
