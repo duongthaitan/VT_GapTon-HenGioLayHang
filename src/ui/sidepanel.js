@@ -20,6 +20,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         startRunning: `<svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M21 12a9 9 0 11-3.36-7.02"/></svg> Đang chạy…`,
         kiemkePlay:   `<svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><polygon points="4 2.5 17 10 4 17.5"/></svg> Chạy Kiểm Kê Tự Động`,
         kiemkeRun:    `<svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M21 12a9 9 0 11-3.36-7.02"/></svg> Đang kiểm kê...`,
+        gaptonPlay:   `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" width="15" height="15"><path d="M17.5 13.3V6.7a1.7 1.7 0 00-.83-1.44L10.83 1.9a1.7 1.7 0 00-1.66 0L3.33 5.26A1.7 1.7 0 002.5 6.7v6.6a1.7 1.7 0 00.83 1.44l5.84 3.36a1.7 1.7 0 001.66 0l5.84-3.36A1.7 1.7 0 0017.5 13.3z"/></svg> Quét Mã Kiểm Tồn`,
     };
 
     // ════════════════════════════════════════
@@ -245,12 +246,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     let loadedRoutes = []; // Danh sách tuyến đã load
 
-    // Fix #4: Visual status của từng route item
+    // Fix #4 + #7: Visual status — lookup bằng data-index (an toàn hơn tên)
     function setRouteStatus(routeName, status) {
-        const escapedName = routeName.replace(/"/g, '\\"');
-        const cb = routeChecklist.querySelector(`.route-item-cb[data-route="${escapedName}"]`);
-        if (!cb) return;
-        const item = cb.closest('.route-item');
+        // Tìm bằng data-index nếu có, fallback bằng route name
+        const idx = loadedRoutes.indexOf(routeName);
+        let item = null;
+        if (idx >= 0) {
+            const cb = routeChecklist.querySelector(`.route-item-cb[data-index="${idx}"]`);
+            if (cb) item = cb.closest('.route-item');
+        }
         if (!item) return;
         item.classList.remove('is-running', 'is-done', 'is-error');
 
@@ -275,7 +279,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         statusBoxGapTon.querySelector('.alert-title').textContent = title;
         statusBoxGapTon.querySelector('.alert-desc').textContent  = desc;
         const dot = statusBoxGapTon.querySelector('.alert-pulse');
-        if (dot) dot.style.background = isReady ? 'var(--c-green)' : 'var(--c-amber)';
+        if (dot) dot.style.background = isReady ? 'var(--green)' : 'var(--amber)';
         startGapTonBtn.disabled      = !isReady;
         loadRoutesBtn.disabled       = !isReady;
     }
@@ -901,16 +905,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             console.error('[VTP] Lỗi inject Kiểm Tồn:', e);
             alert('Không thể chạy script. Hãy kiểm tra lại trang ViettelPost!');
             startGapTonBtn.disabled  = false;
-            startGapTonBtn.innerHTML = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" width="15" height="15"><path d="M17.5 13.3V6.7a1.7 1.7 0 00-.83-1.44L10.83 1.9a1.7 1.7 0 00-1.66 0L3.33 5.26A1.7 1.7 0 002.5 6.7v6.6a1.7 1.7 0 00.83 1.44l5.84 3.36a1.7 1.7 0 001.66 0l5.84-3.36A1.7 1.7 0 0017.5 13.3z"/></svg> Quét Mã Kiểm Tồn';
+            startGapTonBtn.innerHTML = BTN_HTML.gaptonPlay;
             return;
         }
 
         // Side panel không đóng được bằng window.close()
         // Tool đã inject thành công, người dùng có thể tiếp tục xem trạng thái
-        startGapTonBtn.innerHTML = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" width="15" height="15"><path d="M17.5 13.3V6.7a1.7 1.7 0 00-.83-1.44L10.83 1.9a1.7 1.7 0 00-1.66 0L3.33 5.26A1.7 1.7 0 002.5 6.7v6.6a1.7 1.7 0 00.83 1.44l5.84 3.36a1.7 1.7 0 001.66 0l5.84-3.36A1.7 1.7 0 0017.5 13.3z"/></svg> ✅ Đã nạp script!';
+        startGapTonBtn.innerHTML = BTN_HTML.gaptonPlay.replace('Quét Mã Kiểm Tồn', '✅ Đã nạp script!');
         setTimeout(() => {
             startGapTonBtn.disabled  = false;
-            startGapTonBtn.innerHTML = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" width="15" height="15"><path d="M17.5 13.3V6.7a1.7 1.7 0 00-.83-1.44L10.83 1.9a1.7 1.7 0 00-1.66 0L3.33 5.26A1.7 1.7 0 002.5 6.7v6.6a1.7 1.7 0 00.83 1.44l5.84 3.36a1.7 1.7 0 001.66 0l5.84-3.36A1.7 1.7 0 0017.5 13.3z"/></svg> Quét Mã Kiểm Tồn';
+            startGapTonBtn.innerHTML = BTN_HTML.gaptonPlay;
         }, 3000);
     });
 
