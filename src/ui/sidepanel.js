@@ -617,11 +617,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // ♥ HELPER: chờ trang scan mở (hỗ trợ cả full-nav và SPA)
         //   • Full-nav: URL thay đổi và tab status = complete
-        //   • SPA     : URL giữ nguyên nhưng input.clsinputpg xuất hiện
+        //   • SPA TH1 : input.clsinputpg xuất hiện (tab có mã)
+        //   • SPA TH2 : span.z-label "Hoàn thành" xuất hiện (tab trống)
         //
-        // FIX BUG: SPA poller phải kiểm tra __VTP_5STEPS_INJECTED__ = true
-        //   để tránh false-positive khi trang vừa reload và input.clsinputpg
-        //   xuất hiện TRƯỚC khi script 5 bước thực sự bắt đầu chạy.
+        // Guard: phải có __VTP_5STEPS_INJECTED__ = true để tránh false-positive
+        //   Trước khi script 5 bước chạy, trang cũ có thể đang reload và các element
+        //   cũ vẫn xuất hiện trong thời gian ngắn → cần kiểm tra cờ inject.
         function waitForScanPage(tabId, urlBefore, timeoutMs = 90000) {
             return new Promise((resolve) => {
                 let done = false;
@@ -806,7 +807,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     files: ['src/shared/notification.js', 'src/modules/kiemke/gapton_settings.js', 'src/modules/kiemke/gapton_smart_delay.js', 'src/modules/kiemke/gapton_core_scan.js']
                 });
 
-                // I: Poll __VTP_SCAN_COMPLETE__ (timeout 30 phút)
+                // I: Poll __VTP_SCAN_COMPLETE__ (timeout 10 phút)
                 routeProgressStatus.textContent = `[${i + 1}/${selectedRoutes.length}] Chờ quét xong: ${route}...`;
                 console.log('[VTP] Chờ __VTP_SCAN_COMPLETE__...');
                 const scanDone = await pollPageVar(mainTabId, '__VTP_SCAN_COMPLETE__', 3000, 600000); // [Fix #18] 10 phút thay vì 30 phút
