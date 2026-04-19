@@ -1,16 +1,12 @@
 // ============================================================
 //  VTP Tool – Popup Controller
-//  v2.1 Changes:
-//    - Fix #1 : Nút Dừng cho Tab Kiểm Kê Tuyến + cancel token
-//    - Fix #2 : Lưu mainTabId trước vòng lặp, dùng get() thay active query
-//    - Fix #3 : Đồng bộ version comment
-//    - Fix #4 : Visual feedback is-running / is-done / is-error trên route items
-//    - Fix #5 : Extract resetBtn() helper
-//    - Fix #6 : Confirm dialog khi chạy >= 3 tuyến
-//    - Fix #7 : ETA / elapsed timer
-//    - Fix #13: aria-selected được cập nhật khi switch tab
-//    - Fix #14: Persist routes qua chrome.storage.session
-//    - Fix #16: pollPageVar cleanup khi tab bị đóng
+//  v2.2 Bug Fixes & Optimizations:
+//    - Fix #17: Double F5 — bỏ location.reload() thừa ở bước J
+//               (gapton_core_scan đã tự reload, sidepanel chỉ cần chờ)
+//    - Fix #18: Poll timeout 30 phút → 10 phút (600000ms)
+//    - Fix #19: SPA poller detect TH1 (input.clsinputpg) VÀ TH2 (tab trống)
+//    - Fix #20: reloadAfterScanPromise đăng ký TRƯỚC inject để không miss reload
+//  v2.1 Changes: Fix #1–#16 (xem git log)
 // ============================================================
 document.addEventListener('DOMContentLoaded', async () => {
 
@@ -649,22 +645,24 @@ document.addEventListener('DOMContentLoaded', async () => {
                 };
                 chrome.tabs.onUpdated.addListener(navListener);
 
-                // Chế độ 2: SPA – poll input.clsinputpg
-                // PHẢI kiểm tra __VTP_5STEPS_INJECTED__ để đảm bảo script
-                // 5 bước đã chạy (tránh nhận nhầm input từ trang reload cũ)
+                // Chế độ 2: SPA – poll trang scan (hỗ trợ TH1 có mã VÀ TH2 tab trống)
+                // PHẢI kiểm tra __VTP_5STEPS_INJECTED__ để tránh false-positive từ trang cũ
                 const spaPoller = setInterval(async () => {
                     try {
                         const res = await chrome.scripting.executeScript({
                             target: { tabId }, world: 'MAIN',
                             func: () => {
-                                // Chỉ accept nếu script 5 bước đã inject và chạy
                                 const injected = !!window.__VTP_5STEPS_INJECTED__;
+                                // TH1: tab có mã → input.clsinputpg tồn tại
                                 const hasInput = !!document.querySelector('input.clsinputpg');
-                                return injected && hasInput;
+                                // TH2: tab trống → span.z-label "Hoàn thành" chỉ xuất hiện trên trang scan
+                                const hasHoanThanh = Array.from(document.querySelectorAll('span.z-label'))
+                                    .some(el => el.textContent.trim() === 'Hoàn thành');
+                                return injected && (hasInput || hasHoanThanh);
                             }
                         });
                         if (res?.[0]?.result === true) {
-                            console.log('[VTP] ♥ SPA: 5 bước đã inject + input.clsinputpg xuất hiện');
+                            console.log('[VTP] ♥ SPA: trang scan đã mở (TH1: input | TH2: Hoàn thành)');
                             finish(true);
                         }
                     } catch (_) {} // tab đang navigate
@@ -793,6 +791,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // Buffer nhỏ để trang render đầy đủ
                 await new Promise(r => setTimeout(r, 2500));
 
+                // [Fix #17+#20] Đăng ký listener TRƯỚC khi inject gapton_core_scan
+                // gapton_core_scan tự gọi location.reload() sau 2s khi scan xong
+                // → phải đăng ký trước để không miss sự kiện reload
+                const reloadAfterScanPromise = (i < selectedRoutes.length - 1 && !cancelToken.cancelled)
+                    ? waitForTabReload(mainTabId, '', 35000)
+                    : Promise.resolve(true);
+
                 // H: Inject gapton_core_scan
                 routeProgressStatus.textContent = `[${i + 1}/${selectedRoutes.length}] Đang quét mã: ${route}`;
                 console.log('[VTP] Inject gapton_core_scan.js...');
@@ -804,7 +809,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // I: Poll __VTP_SCAN_COMPLETE__ (timeout 30 phút)
                 routeProgressStatus.textContent = `[${i + 1}/${selectedRoutes.length}] Chờ quét xong: ${route}...`;
                 console.log('[VTP] Chờ __VTP_SCAN_COMPLETE__...');
-                const scanDone = await pollPageVar(mainTabId, '__VTP_SCAN_COMPLETE__', 3000, 1800000);
+                const scanDone = await pollPageVar(mainTabId, '__VTP_SCAN_COMPLETE__', 3000, 600000); // [Fix #18] 10 phút thay vì 30 phút
                 await clearPageVar(mainTabId, '__VTP_SCAN_COMPLETE__');
 
                 if (!scanDone) {
@@ -816,21 +821,26 @@ document.addEventListener('DOMContentLoaded', async () => {
                     setRouteStatus(route, 'done');  // Fix #4
                 }
 
-                // J: Navigate về trang danh sách (chuẩn bị cho tuyến tiếp theo)
+                // J: Chờ trang tự reload — gapton_core_scan đã gọi location.reload() sau 2s
+                //    [Fix #17] KHÔNG gọi location.reload() thêm → tránh double F5
+                //    reloadAfterScanPromise đã đăng ký trước inject → không miss event
                 if (i < selectedRoutes.length - 1 && !cancelToken.cancelled) {
-                    routeProgressStatus.textContent = `[${i + 1}/${selectedRoutes.length}] Tải lại trang...`;
-                    const reloadPromise = waitForTabReload(mainTabId, '', 30000);
-                    await chrome.scripting.executeScript({
-                        target: { tabId: mainTabId }, world: 'MAIN',
-                        func: () => {
-                            if (location.hostname === 'localhost') {
-                                location.href = '/viettelpost/kiem-ke-buu-pham';
-                            } else {
-                                location.reload();
-                            }
-                        }
-                    });
-                    await reloadPromise;
+                    routeProgressStatus.textContent = `[${i + 1}/${selectedRoutes.length}] Chờ tải lại trang...`;
+                    if (scanDone) {
+                        // Scan OK: gapton_core_scan tự reload sau 2s → chỉ cần chờ
+                        await reloadAfterScanPromise;
+                    } else {
+                        // Scan thất bại / timeout: gapton_core_scan có thể không reload
+                        // → chủ động reload để tuyến tiếp theo có trạng thái sạch
+                        const manualP = waitForTabReload(mainTabId, '', 20000);
+                        try {
+                            await chrome.scripting.executeScript({
+                                target: { tabId: mainTabId }, world: 'MAIN',
+                                func: () => location.reload()
+                            });
+                        } catch (_) {}
+                        await manualP;
+                    }
                     await new Promise(r => setTimeout(r, 1500));
                 }
 

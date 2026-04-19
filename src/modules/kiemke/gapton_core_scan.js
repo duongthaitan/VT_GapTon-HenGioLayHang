@@ -11,7 +11,7 @@
 (async () => {
     const MAX_HISTORY = 80; // Giới hạn số mục trong history để tránh memory leak
 
-    // ── BƯỚC 6: Click tab "Bưu phẩm chưa kiểm kê" ──
+    // ── Khởi tạo: Switch sang tab "Bưu phẩm chưa kiểm kê" ──
     // Phải switch tab TRƯỚC, vì input.clsinputpg chỉ xuất hiện khi ở tab chưa kiểm kê
     // Mặc định trang scan mở ở tab "Bưu phẩm đã kiểm kê" → phải chuyển sang tab chưa kiểm kê
     //

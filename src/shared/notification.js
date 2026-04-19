@@ -28,7 +28,7 @@ window.VTPNotification = (function () {
     }
 
     return {
-        show(message, type = 'info') {
+        show(message, type = 'info', duration = 3000) {
             // Dừng và xóa thông báo cũ nếu có
             _clear();
 
@@ -74,7 +74,7 @@ window.VTPNotification = (function () {
                 });
             });
 
-            // Fade out sau 3 giây
+            // Fade out sau {duration}ms (mặc định 3s, có thể tùy chỉnh)
             _fadeOutTimer = setTimeout(() => {
                 if (!_current) return;
                 notif.style.opacity   = '0';
@@ -85,7 +85,7 @@ window.VTPNotification = (function () {
                     if (document.body && document.body.contains(notif)) notif.remove();
                     if (_current === notif) _current = null;
                 }, 320);
-            }, 3000);
+            }, duration);
         }
     };
 })();

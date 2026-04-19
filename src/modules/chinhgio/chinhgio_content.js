@@ -180,7 +180,11 @@ if (window.__VTP_CHINHGIO_RUNNING__) {
                 // ═══════════════════════════════════════════
                 // BƯỚC 3: Mở menu Sửa đơn
                 // ═══════════════════════════════════════════
-                const menuIcon = await waitForElement('i.fa.fa-bars', 8000);
+                // Fallback selector: FA4, FA5 solid, FA6, hoặc bất kỳ class chứa fa-bars
+                const menuIcon = await waitForElement(
+                    'i.fa.fa-bars, i.fas.fa-bars, i.fa-solid.fa-bars, [class*="fa-bars"]',
+                    8000
+                );
                 if (!menuIcon) {
                     throw new Error('Không load được bảng kết quả (mạng chậm hoặc mã không hợp lệ)');
                 }
@@ -248,12 +252,10 @@ if (window.__VTP_CHINHGIO_RUNNING__) {
                         }
                         await sleep(500);
 
-                        // Chọn "Cả ngày"
+                        // Chọn "Cả ngày" — chỉ match theo text, không hardcode ID attribute
+                        // (ID có thể thay đổi khi VTP nâng cấp UI)
                         const labelCaNgay = Array.from(document.querySelectorAll('label.lb-time'))
-                                                 .find(lbl =>
-                                                     lbl.getAttribute('for') === '1_op' &&
-                                                     lbl.innerText.includes('Cả ngày')
-                                                 );
+                                                 .find(lbl => lbl.innerText.includes('Cả ngày'));
                         if (labelCaNgay) labelCaNgay.click();
                         await sleep(500);
 
