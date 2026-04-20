@@ -293,11 +293,11 @@ window.__VTP_CORE_SCAN_RUNNING__ = true;
         await clickHoanThanh();
 
         // Báo hiệu scan xong → sidepanel sẽ chuyển tuyến tiếp
-        window.__VTP_SCAN_COMPLETE__ = true;
-        console.log('[VTP Core] ✅ __VTP_SCAN_COMPLETE__ = true (TH2: tab trống)');
+        window.__VTP_SCAN_COMPLETE__      = true;
+        window.__VTP_CORE_SCAN_RUNNING__  = false;
+        console.log('[VTP Core] ✅ __VTP_SCAN_COMPLETE__ = true (TH2: tab trống). Đợi 2s rồi F5...');
         await new Promise(r => setTimeout(r, 2000)); // Đợi 2s
         location.reload();                            // F5 → sidepanel chuyển tuyến tiếp
-        window.__VTP_CORE_SCAN_RUNNING__ = false;
         return;
     }
 
@@ -332,6 +332,14 @@ window.__VTP_CORE_SCAN_RUNNING__ = true;
 
     extUI = document.createElement('div');
     extUI.id = 'vtp-auto-ext-ui';
+    // Inject keyframe animation nếu chưa có
+    if (!document.getElementById('vtp-scan-style')) {
+        const styleEl = document.createElement('style');
+        styleEl.id = 'vtp-scan-style';
+        styleEl.textContent = '@keyframes slideUpIn { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }';
+        document.head.appendChild(styleEl);
+    }
+
     extUI.innerHTML = `
         <div style="position:fixed;bottom:30px;right:30px;width:360px;background:#ffffff;border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,0.15),0 1px 3px rgba(0,0,0,0.1);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;z-index:999999;overflow:hidden;animation:slideUpIn 0.3s ease-out forwards;display:flex;flex-direction:column;border:1px solid #dee2e6;">
             <div style="background:#ee0033;padding:14px 20px;color:white;display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #cc002b;">
@@ -635,10 +643,10 @@ window.__VTP_CORE_SCAN_RUNNING__ = true;
         }
 
         // Báo hiệu cho sidepanel → đợi 2s → F5
-        window.__VTP_SCAN_COMPLETE__ = true;
+        window.__VTP_SCAN_COMPLETE__     = true;
+        window.__VTP_CORE_SCAN_RUNNING__ = false;
         console.log('[VTP Core] ✅ Scan hoàn tất – __VTP_SCAN_COMPLETE__ = true. Đợi 2s rồi F5...');
         await new Promise(r => setTimeout(r, 2000));
-        window.__VTP_CORE_SCAN_RUNNING__ = false;
         location.reload();
     } else {
         window.__VTP_CORE_SCAN_RUNNING__ = false;
