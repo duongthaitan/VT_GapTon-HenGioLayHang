@@ -1,11 +1,14 @@
 // ============================================================
 //  VTP Tool – Popup Controller
-//  v2.3 Critical Fix:
+//  v2.4 Critical Fix:
+//    - Fix #22: Race condition pollScanComplete — đăng ký listener
+//              TRƯỚC khi inject scan script (không phải sau), tránh miss
+//              tín hiệu khi script scan chạy xong trước khi listener kịp gắn.
+//              KHÔNG remove signal trong pollScanComplete, chỉ clearScanComplete()
+//              trước khi đăng ký poll. Tăng reload timeout 35s → 60s.
 //    - Fix #21: Dùng chrome.storage.local thay vì window variable
 //              để nhận tín hiệu scan xong (tồn tại qua reload)
 //    - Fix #17: Double F5 — bỏ location.reload() thừa ở bước J
-//    - Fix #18: Poll timeout 30 phút → 10 phút (600000ms)
-//    - Fix #19: SPA poller detect TH1 VÀ TH2
 //    - Fix #20: reloadAfterScanPromise đăng ký TRƯỚC inject
 // ============================================================
 document.addEventListener('DOMContentLoaded', async () => {
@@ -570,12 +573,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // ── Helper: chờ tín hiệu scan xong qua chrome.storage.local ──
         // [Fix #21] Dùng storage thay vì window variable → tồn tại qua reload
+        // [Fix #22] KHÔNG remove signal ngay lúc khởi tạo — tránh xóa mất tín hiệu
+        //           đã được set nếu script scan chạy trước khi poll kịp đăng ký.
+        //           Việc xóa signal cũ phải được thực hiện bởi clearScanComplete()
+        //           TRƯỚC KHI inject script scan, không phải bên trong pollScanComplete.
         function pollScanComplete(timeoutMs = 600000) {
             return new Promise((resolve) => {
                 let resolved = false;
-
-                // Xóa cờ cũ trước khi bắt đầu lắng nghe
-                chrome.storage.local.remove('__VTP_SCAN_COMPLETE__');
 
                 const deadline = setTimeout(() => {
                     if (resolved) return;
@@ -585,6 +589,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     resolve(false);
                 }, timeoutMs);
 
+                // Đăng ký listener TRƯỚC (tránh miss event)
                 function listener(changes, namespace) {
                     if (namespace !== 'local' || resolved) return;
                     if (changes.__VTP_SCAN_COMPLETE__?.newValue === true) {
@@ -597,13 +602,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
                 chrome.storage.onChanged.addListener(listener);
 
-                // Backup: kiểm tra ngay lập tức (phòng trường hợp storage đã được set trước khi listener đăng ký)
+                // Backup: kiểm tra ngay sau khi đăng ký listener
+                // (phòng trường hợp storage đã được set trước khi listener đăng ký)
                 chrome.storage.local.get('__VTP_SCAN_COMPLETE__', (data) => {
                     if (data.__VTP_SCAN_COMPLETE__ === true && !resolved) {
                         resolved = true;
                         clearTimeout(deadline);
                         chrome.storage.onChanged.removeListener(listener);
-                        console.log('[VTP] ✅ __VTP_SCAN_COMPLETE__ đã có sẵn trong storage!');
+                        console.log('[VTP] ✅ __VTP_SCAN_COMPLETE__ đã có sẵn trong storage (backup check)!');
                         resolve(true);
                     }
                 });
@@ -794,30 +800,38 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // Buffer nhỏ để trang render đầy đủ
                 await new Promise(r => setTimeout(r, 2500));
 
-                // [Fix #17+#20] Đăng ký listener TRƯỚC khi inject gapton_core_scan
+                // [Fix #17+#20] Đăng ký reloadAfterScanPromise TRƯỚC khi inject gapton_core_scan
                 // gapton_core_scan tự gọi location.reload() sau 2s khi scan xong
                 // → phải đăng ký trước để không miss sự kiện reload
                 const reloadAfterScanPromise = (i < selectedRoutes.length - 1 && !cancelToken.cancelled)
-                    ? waitForTabReload(mainTabId, '', 35000)
+                    ? waitForTabReload(mainTabId, '', 60000)
                     : Promise.resolve(true);
 
                 // H: Inject gapton_core_scan
                 routeProgressStatus.textContent = `[${i + 1}/${selectedRoutes.length}] Đang quét mã: ${route}`;
                 console.log('[VTP] Inject gapton_core_scan.js...');
 
-                // [Fix #21] Xóa signal cũ TRƯỚC khi inject scan script
+                // [Fix #22] Xóa signal cũ TRƯỚC khi inject VÀ TRƯỚC khi đăng ký poll
+                // Thứ tự đúng: clearScanComplete → pollScanComplete → inject script
+                // Nếu đăng ký poll TRƯỚC khi xóa signal → có thể nhận tín hiệu cũ từ lần trước
+                // Nếu đăng ký poll SAU khi inject → script có thể set signal trước khi poll lắng nghe
                 await clearScanComplete();
+
+                // [Fix #22] Đăng ký pollScanComplete NGAY TRƯỚC inject (không phải sau inject)
+                // → Đảm bảo listener đã sẵn sàng trước khi gapton_core_scan.js chạy
+                routeProgressStatus.textContent = `[${i + 1}/${selectedRoutes.length}] Chờ quét xong: ${route}...`;
+                console.log('[VTP] Đăng ký pollScanComplete TRƯỚC inject...');
+                const scanDonePromise = pollScanComplete(600000);
 
                 await chrome.scripting.executeScript({
                     target: { tabId: mainTabId }, world: 'MAIN',
                     files: ['src/shared/notification.js', 'src/modules/kiemke/gapton_settings.js', 'src/modules/kiemke/gapton_smart_delay.js', 'src/modules/kiemke/gapton_core_scan.js']
                 });
+                console.log('[VTP] Inject gapton_core_scan.js xong. Đang chờ tín hiệu scan complete...');
 
                 // I: Chờ tín hiệu scan xong từ chrome.storage.local (timeout 10 phút)
-                // [Fix #21] Dùng storage listener thay vì poll window variable
-                routeProgressStatus.textContent = `[${i + 1}/${selectedRoutes.length}] Chờ quét xong: ${route}...`;
-                console.log('[VTP] Chờ __VTP_SCAN_COMPLETE__ từ storage...');
-                const scanDone = await pollScanComplete(600000);
+                // [Fix #22] scanDonePromise đã được đăng ký trước inject → không miss signal
+                const scanDone = await scanDonePromise;
                 await clearScanComplete();
 
                 if (!scanDone) {
