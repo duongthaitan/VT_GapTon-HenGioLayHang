@@ -141,18 +141,18 @@ window.__VTP_KIEMKE_RUNNING__ = true;
         kiemKeBtn.click();
         await sleep(DIALOG_WAIT);
 
-        // ════ BƯỚC 5: Click "OK" trong dialog ════
-        notify('Bước 5/5: Click "OK"...', 'info');
+        // ════ BƯỚC 5: Click "Chấp nhận" trong dialog ════
+        notify('Bước 5/5: Click "Chấp nhận"...', 'info');
         let acceptBtn = null;
         const t1 = Date.now();
         while (!acceptBtn && Date.now() - t1 < STEP_TIMEOUT) {
             for (const btn of document.querySelectorAll('.z-messagebox-button')) {
                 const txt = normalizeText(btn.textContent);
-                if (txt === 'ok' || txt === 'OK') { acceptBtn = btn; break; }
+                if (txt === 'Chấp nhận' || txt === 'OK' || txt === 'ok') { acceptBtn = btn; break; }
             }
             if (!acceptBtn) await sleep(300);
         }
-        if (!acceptBtn) throw new Error('Không tìm thấy nút "OK" sau ' + STEP_TIMEOUT + 'ms!');
+        if (!acceptBtn) throw new Error('Không tìm thấy nút "Chấp nhận" sau ' + STEP_TIMEOUT + 'ms!');
 
         acceptBtn.click();
 

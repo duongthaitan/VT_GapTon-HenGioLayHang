@@ -560,8 +560,33 @@ window.__VTP_CORE_SCAN_RUNNING__ = true;
         const processedOnPage = totalOnPage - remaining;
         updateProgress(processedOnPage, totalOnPage);
 
-        // Không còn mã chưa quét trên trang → lật trang
+        // Không còn mã chưa quét trên trang → retry chờ ZK re-render
+        // [v1.5 Fix] ZK Framework cần thời gian re-render list sau khi xóa row.
+        // Nếu getValidCodes() chạy quá sớm, các mã ở đầu list chưa xuất hiện
+        // trong DOM → bị kết luận sai là "hết mã" → sót đơn.
+        // Retry tối đa 3 lần (mỗi lần chờ 500ms) trước khi kết luận thật sự hết.
         if (!target) {
+            let retryFound = false;
+            for (let retry = 0; retry < 3; retry++) {
+                await new Promise(r => setTimeout(r, 500));
+                const retryList = getValidCodes();
+                for (const item of retryList) {
+                    if (!processedCodeSet.has(item.code)) {
+                        retryFound = true;
+                        console.log(`[VTP Core] ♻️ Retry ${retry + 1}: tìm thấy mã chưa quét "${item.code}" sau khi ZK re-render`);
+                        break;
+                    }
+                }
+                if (retryFound) break;
+            }
+
+            // Nếu retry tìm được mã mới → quay lại đầu vòng lặp để xử lý
+            if (retryFound) {
+                console.log('[VTP Core] ♻️ ZK đã re-render xong, tiếp tục quét...');
+                continue;
+            }
+
+            // Thật sự hết mã trên trang → lật trang
             statusEl.textContent = 'Đang lật trang...';
             const oldFirstCode   = allCodesOnPage.length > 0 ? allCodesOnPage[0].code : '';
 
@@ -647,7 +672,7 @@ window.__VTP_CORE_SCAN_RUNNING__ = true;
         }
 
         tabs.btnHistory.textContent = `Lịch Sử (${processedCount})`;
-        if (window.VTPSmartDelay) await window.VTPSmartDelay.sleep(50); // Tối ưu từ 150ms
+        if (window.VTPSmartDelay) await window.VTPSmartDelay.sleep(300); // [v1.5] Tăng từ 50ms → chờ ZK re-render list
     }
 
     // ════════════════════════════════════════════════════════════
