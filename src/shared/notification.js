@@ -58,7 +58,8 @@ window.VTPNotification = (function () {
                 transform:       'translateY(-20px)',
                 maxWidth:        '340px',
                 wordBreak:       'break-word',
-                lineHeight:      '1.4'
+                lineHeight:      '1.4',
+                whiteSpace:      'pre-line'
             });
 
             notif.textContent = message;

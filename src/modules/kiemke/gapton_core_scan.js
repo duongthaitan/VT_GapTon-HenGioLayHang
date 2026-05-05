@@ -342,8 +342,11 @@ window.__VTP_CORE_SCAN_RUNNING__ = true;
         if (window.VTPNotification?.show)
             window.VTPNotification.show('LỖI: Không tìm thấy ô nhập Mã kiện (.clsinputpg)!', 'error');
         console.error('[VTP Core] ❌ Không tìm thấy input.clsinputpg sau 10s');
-        window.__VTP_SCAN_COMPLETE__ = false;
         window.__VTP_CORE_SCAN_RUNNING__ = false;
+        // [v1.5 Fix] Phải reload để sidepanel nhận tín hiệu (waitForTabReload)
+        // Nếu không reload → sidepanel treo vĩnh viễn chờ tín hiệu
+        await new Promise(r => setTimeout(r, 1000));
+        location.reload();
         return;
     }
 
