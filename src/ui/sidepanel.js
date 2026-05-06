@@ -674,7 +674,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             finish(true);
                         }
                     } catch (_) {} // tab đang navigate
-                }, 1200);
+                }, 800); // [v2.5] Giảm từ 1200ms
             });
         }
 
@@ -797,7 +797,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 console.log('[VTP] ✅ Trang scan đã mở');
 
                 // Buffer nhỏ để trang render đầy đủ (tối ưu từ 2500ms)
-                await new Promise(r => setTimeout(r, 1000));
+                await new Promise(r => setTimeout(r, 500)); // [v2.5] Giảm từ 1000ms
 
                 // H: Inject gapton_core_scan
                 routeProgressStatus.textContent = `[${i + 1}/${selectedRoutes.length}] Đang quét mã: ${route}`;
@@ -848,7 +848,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         } catch (_) {}
                         await manualP;
                     }
-                    await new Promise(r => setTimeout(r, 500)); // Tối ưu từ 1500ms
+                    await new Promise(r => setTimeout(r, 200)); // [v2.5] Giảm từ 500ms
                 }
 
             } catch (e) {
@@ -863,7 +863,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         func: () => location.reload()
                     });
                     await reloadPromise;
-                    await new Promise(r => setTimeout(r, 1500));
+                    await new Promise(r => setTimeout(r, 800)); // [v2.5] Giảm từ 1500ms
                 } catch (_) {}
             }
 
@@ -875,7 +875,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             if (i < selectedRoutes.length - 1 && !cancelToken.cancelled) {
                 routeProgressStatus.textContent = `✔️ Xong tuyến ${i + 1}. Chuyển sang tuyến ${i + 2}: ${selectedRoutes[i + 1]}...`;
-                await new Promise(r => setTimeout(r, 500)); // Tối ưu từ 1500ms
+                await new Promise(r => setTimeout(r, 200)); // [v2.5] Giảm từ 500ms
             }
         }
 

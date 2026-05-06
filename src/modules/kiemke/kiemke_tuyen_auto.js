@@ -1,13 +1,14 @@
 // ============================================================
-//  VTP Tool – Kiểm Kê Tuyến Auto  v1.4
+//  VTP Tool – Kiểm Kê Tuyến Auto  v1.5
 //  Thực hiện 5 bước chọn tuyến → vào trang scan
 //  popup.js dùng tab.onUpdated để phát hiện khi trang scan mở.
 //
-//  Thay đổi v1.4:
+//  Thay đổi v1.5:
+//    [⚡] SPEED: Giảm tất cả delay xuống mức tối thiểu an toàn
+//        - STEP_DELAY: 500 → 300ms  |  POPUP_WAIT: 800 → 400ms
+//        - DIALOG_WAIT: 1000 → 500ms  |  Loading poll: 300 → 150ms
 //    [+] Guard chống inject lại (__VTP_KIEMKE_RUNNING__)
-//    [+] Chờ loading indicator biến mất sau mỗi bước (tránh race condition)
-//    [+] Bước 2 tìm tuyến: thêm normalize NBSP + trim mạnh hơn
-//    [+] Timeout rõ ràng hơn cho từng bước
+//    [+] Normalize NBSP + trim mạnh hơn
 // ============================================================
 if (window.__VTP_KIEMKE_RUNNING__) {
     console.warn('[VTP KiểmKê] Script đã đang chạy. Bỏ qua inject mới.');
@@ -17,10 +18,10 @@ window.__VTP_KIEMKE_RUNNING__ = true;
 (async () => {
     'use strict';
 
-    const STEP_TIMEOUT = 15000; // Timeout chờ 1 element xuất hiện
-    const STEP_DELAY   = 500;   // Delay giữa các bước (tối ưu từ 1500)
-    const POPUP_WAIT   = 800;   // Chờ dropdown mở (tối ưu từ 2000)
-    const DIALOG_WAIT  = 1000;  // Chờ dialog xuất hiện (tối ưu từ 3000)
+    const STEP_TIMEOUT = 12000; // [v1.5] Timeout chờ 1 element xuất hiện (giảm từ 15s)
+    const STEP_DELAY   = 300;   // [v1.5] Delay giữa các bước (giảm từ 500)
+    const POPUP_WAIT   = 400;   // [v1.5] Chờ dropdown mở (giảm từ 800)
+    const DIALOG_WAIT  = 500;   // [v1.5] Chờ dialog xuất hiện (giảm từ 1000)
 
     const routeName = window.__VTP_SELECTED_ROUTE__;
     if (!routeName) {
@@ -47,12 +48,12 @@ window.__VTP_KIEMKE_RUNNING__ = true;
     }
 
     /** Chờ loading indicator biến mất (tối đa timeoutMs) */
-    async function waitForLoadingDone(timeoutMs = 8000) {
+    async function waitForLoadingDone(timeoutMs = 6000) {
         const deadline = Date.now() + timeoutMs;
         while (Date.now() < deadline) {
             const loading = document.querySelector('.z-loading-indicator, .z-apply-loading-indicator');
             if (!loading || loading.style.display === 'none' || loading.offsetParent === null) return true;
-            await sleep(300);
+            await sleep(150);
         }
         return false; // Vẫn còn loading sau timeout
     }
@@ -132,7 +133,7 @@ window.__VTP_KIEMKE_RUNNING__ = true;
 
         // Chờ loading indicator biến mất sau khi tìm kiếm
         await waitForLoadingDone(STEP_TIMEOUT);
-        await sleep(300); // Tối ưu từ 800ms
+        await sleep(150); // [v1.5] Giảm từ 300ms
 
         // ════ BƯỚC 4: Click "Kiểm kê" ════
         notify('Bước 4/5: Click "Kiểm kê"...', 'info');
@@ -150,7 +151,7 @@ window.__VTP_KIEMKE_RUNNING__ = true;
                 const txt = normalizeText(btn.textContent);
                 if (txt === 'Chấp nhận' || txt === 'OK' || txt === 'ok') { acceptBtn = btn; break; }
             }
-            if (!acceptBtn) await sleep(300);
+            if (!acceptBtn) await sleep(200);
         }
         if (!acceptBtn) throw new Error('Không tìm thấy nút "Chấp nhận" sau ' + STEP_TIMEOUT + 'ms!');
 
@@ -158,7 +159,7 @@ window.__VTP_KIEMKE_RUNNING__ = true;
 
         // ════ HOÀN TẤT 5 BƯỚC ════
         // Set flag TRƯỚC khi navigation → popup.js có thể nhận tín hiệu
-        await sleep(200);
+        await sleep(100);
         window.__VTP_5STEPS_DONE__ = true;
         notify(`✅ Đã hoàn tất 5 bước cho tuyến "${routeName}"`, 'success');
         console.log('[VTP KiểmKê] ✅ __VTP_5STEPS_DONE__ = true');

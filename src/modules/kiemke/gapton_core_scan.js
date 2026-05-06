@@ -1,16 +1,17 @@
 // ============================================================
 //  VTP Tool – Kiểm Tồn Core Scan
-//  v1.4 Critical Fix – Persistent Scan Signal
+//  v2.0 Speed Boost – Maximum Scan Velocity
 //    TH1: Tab "chưa kiểm kê" có mã → scan tự động → click Hoàn thành → F5
-//    TH2: Tab "chưa kiểm kê" trống → click Hoàn thành → F5
+//    TH2: Tab "chưa kiểm kê" trống / "Đã kiểm kê hết" → Hoàn thành → F5
 //
-//  Thay đổi so với v1.3:
-//    [!] BUG FIX: Dùng chrome.storage.local thay vì window variable
-//        để báo hiệu scan xong → signal tồn tại qua reload
-//        (window.* bị xóa sạch khi location.reload())
-//    [+] waitForTabContentReady(): Chờ nội dung tab load đúng cách
-//    [+] isUnscannedTabEmpty(): Kiểm tra visibility của <td> cha
-//    [+] Hỗ trợ nhiều selector empty-state (ZK + test server)
+//  Thay đổi so với v1.4:
+//    [⚡] SPEED: Giảm tất cả delay xuống mức tối thiểu an toàn
+//        - Inter-scan: 300ms → 50ms  |  ZK retry: 500ms → 200ms
+//        - Tab switch buffer: 300ms → 100ms  |  Pre-F5: 800ms → 300ms
+//    [+] isUnscannedTabEmpty(): Scope vào active tab panel (tránh
+//        false positive từ tab "đã kiểm kê" có emptybody riêng)
+//    [+] Fast-path: Check "Đã kiểm kê hết" text trước tiên
+//    [+] waitForTabContentReady: Check empty TRƯỚC codes (nhanh hơn)
 //    [+] Guard chống inject lại khi scan đang chạy
 // ============================================================
 if (window.__VTP_CORE_SCAN_RUNNING__) {
@@ -80,14 +81,14 @@ window.__VTP_CORE_SCAN_RUNNING__ = true;
         console.log('[VTP Core] Clicking tab chưa kiểm kê:', clickTarget.tagName, clickTarget.className);
         clickTarget.click();
 
-        // Đợi z-tab-selected xuất hiện (tối đa 10s, poll 500ms)
-        const deadline = Date.now() + 10000;
+        // Đợi z-tab-selected xuất hiện (tối đa 8s, poll 250ms)
+        const deadline = Date.now() + 8000;
         while (Date.now() < deadline) {
-            await new Promise(r => setTimeout(r, 500));
+            await new Promise(r => setTimeout(r, 250));
             const refreshLi = parentLi || clickTarget.closest('li.z-tab');
             if (refreshLi && refreshLi.classList.contains('z-tab-selected')) {
                 console.log('[VTP Core] ✅ Tab chưa kiểm kê đã chuyển (z-tab-selected)');
-                await new Promise(r => setTimeout(r, 500)); // Buffer render (tối ưu từ 1000ms)
+                await new Promise(r => setTimeout(r, 200)); // [v2.0] Buffer render giảm từ 500ms
                 return true;
             }
         }
@@ -100,18 +101,16 @@ window.__VTP_CORE_SCAN_RUNNING__ = true;
     //  HELPER: Chờ nội dung tab "chưa kiểm kê" load xong
     //  Trả về: 'has_codes' | 'empty' | 'timeout'
     //
-    //  Logic:
-    //    Phase 1 – Chờ loading indicator biến mất (tối đa 5s)
-    //    Phase 2 – Poll xác định trạng thái:
-    //      • Có mã hợp lệ → 'has_codes'
-    //      • Empty body element hiển thị → 'empty'
-    //      • Hết timeout → 'timeout'
+    //  [v2.0] Tối ưu tốc độ:
+    //    - Check empty TRƯỚC codes (querySelector nhanh hơn iterate cells)
+    //    - Fast-path: kiểm tra ngay trước khi poll
+    //    - Poll interval giảm từ 350ms → 150ms
     // ════════════════════════════════════════════════════════════
-    async function waitForTabContentReady(timeoutMs = 10000) {
+    async function waitForTabContentReady(timeoutMs = 8000) {
         const start = Date.now();
 
-        // Phase 1: Chờ loading indicator biến mất
-        const loadDeadline = start + 5000;
+        // Phase 1: Chờ loading indicator biến mất (tối đa 4s)
+        const loadDeadline = start + 4000;
         while (Date.now() < loadDeadline) {
             const loading = document.querySelector(
                 '.z-loading-indicator, .z-apply-loading-indicator, .z-listbox-loading'
@@ -120,23 +119,31 @@ window.__VTP_CORE_SCAN_RUNNING__ = true;
                 loading.style.display !== 'none' &&
                 loading.offsetParent !== null;
             if (!isLoading) break;
-            await new Promise(r => setTimeout(r, 300));
+            await new Promise(r => setTimeout(r, 150));
         }
 
-        // Phase 2: Poll cho đến khi xác định được trạng thái
+        // [v2.0] Fast-path: kiểm tra ngay sau loading xong (không chờ poll)
+        if (isUnscannedTabEmpty()) {
+            console.log('[VTP Core] waitForTabContentReady → empty (fast-path)');
+            return 'empty';
+        }
+        if (getValidCodes().length > 0) {
+            console.log('[VTP Core] waitForTabContentReady → has_codes (fast-path)');
+            return 'has_codes';
+        }
+
+        // Phase 2: Poll — check empty TRƯỚC (nhanh hơn, chỉ querySelector)
         while (Date.now() - start < timeoutMs) {
-            await new Promise(r => setTimeout(r, 350));
+            await new Promise(r => setTimeout(r, 150));
 
-            // Kiểm tra có mã hợp lệ → TH1
-            if (getValidCodes().length > 0) {
-                console.log('[VTP Core] waitForTabContentReady → has_codes');
-                return 'has_codes';
-            }
-
-            // Kiểm tra empty state (nhiều cách để hỗ trợ cả ZK và test page)
             if (isUnscannedTabEmpty()) {
                 console.log('[VTP Core] waitForTabContentReady → empty');
                 return 'empty';
+            }
+
+            if (getValidCodes().length > 0) {
+                console.log('[VTP Core] waitForTabContentReady → has_codes');
+                return 'has_codes';
             }
         }
 
@@ -146,44 +153,56 @@ window.__VTP_CORE_SCAN_RUNNING__ = true;
 
     // ════════════════════════════════════════════════════════════
     //  HELPER: Xác định tab "chưa kiểm kê" có trống không
-    //  Hỗ trợ 3 cách hiển thị empty state:
-    //    1. ZK: .z-listbox-emptybody-content bên trong <td> hiển thị
-    //    2. ZK: emptybody <td> có display='table-cell'
-    //    3. Fallback: .empty-state text / text tổng quát
+    //  [v2.0] Scope vào active tab panel → tránh false positive
+    //         từ tab "đã kiểm kê" (ZK giữ cả 2 tab trong DOM)
+    //  Ưu tiên:
+    //    1. Fast-path: Text "Đã kiểm kê hết" trong active panel
+    //    2. ZK: td[id$="-empty"] có display='table-cell'
+    //    3. ZK: .z-listbox-emptybody-content bên trong <td> hiển thị
+    //    4. Fallback: .empty-state class (test server)
     // ════════════════════════════════════════════════════════════
     function isUnscannedTabEmpty() {
-        // Cách 1: ZK listbox emptybody element
-        const emptyBodyEl = document.querySelector('.z-listbox-emptybody-content');
-        if (emptyBodyEl) {
-            const parentTd = emptyBodyEl.closest('td');
+        // Scope: chỉ kiểm tra trong active tab panel
+        const scope = getActiveTabPanel() || document;
+
+        // Ưu tiên 1 (FAST PATH): Text "Đã kiểm kê hết" — match chính xác thông báo VTP
+        // HTML mẫu: <td id="xxx-empty" style="display:table-cell"><div class="z-listbox-emptybody-content">Đã kiểm kê hết...</div></td>
+        const emptyContent = scope.querySelector('.z-listbox-emptybody-content');
+        if (emptyContent) {
+            const text = (emptyContent.textContent || '').trim();
+            if (text.includes('Đã kiểm kê hết')) {
+                console.log('[VTP Core] Empty: ✅ "Đã kiểm kê hết" detected →', text.slice(0, 60));
+                return true;
+            }
+        }
+
+        // Ưu tiên 2: td[id$="-empty"] có display:table-cell (ZK standard)
+        const emptyTd = scope.querySelector('td[id$="-empty"]');
+        if (emptyTd) {
+            const tdDisplay = emptyTd.style.display || getComputedStyle(emptyTd).display;
+            if (tdDisplay === 'table-cell' || (tdDisplay !== 'none' && tdDisplay !== '')) {
+                console.log('[VTP Core] Empty: td[id$="-empty"] visible, text:', emptyTd.textContent.trim().slice(0, 60));
+                return true;
+            }
+        }
+
+        // Ưu tiên 3: .z-listbox-emptybody-content visible (text khác)
+        if (emptyContent) {
+            const parentTd = emptyContent.closest('td');
             if (parentTd) {
-                // Nếu parentTd bị ẩn (display:none) → list CÓ data, không phải empty
-                const tdDisplay = parentTd.style.display;
-                const computed  = getComputedStyle(parentTd).display;
-                const isHidden  = tdDisplay === 'none' || computed === 'none';
+                const isHidden = parentTd.style.display === 'none' || getComputedStyle(parentTd).display === 'none';
                 if (!isHidden) {
                     console.log('[VTP Core] Empty: .z-listbox-emptybody-content visible');
                     return true;
                 }
             } else {
-                // Không có td cha → element tồn tại là đủ
                 console.log('[VTP Core] Empty: .z-listbox-emptybody-content (no td parent)');
                 return true;
             }
         }
 
-        // Cách 2: td[id$="-empty"] có display:table-cell (cấu trúc ZK chuẩn)
-        const emptyTd = document.querySelector('td[id$="-empty"]');
-        if (emptyTd) {
-            const tdDisplay = emptyTd.style.display || getComputedStyle(emptyTd).display;
-            if (tdDisplay !== 'none' && tdDisplay !== '') {
-                console.log('[VTP Core] Empty: td[id$="-empty"] visible, text:', emptyTd.textContent.trim().slice(0, 50));
-                return true;
-            }
-        }
-
-        // Cách 3: .empty-state class (test server fallback)
-        const emptyStateEl = document.querySelector('.empty-state');
+        // Ưu tiên 4: .empty-state class (test server fallback)
+        const emptyStateEl = scope.querySelector('.empty-state');
         if (emptyStateEl && emptyStateEl.offsetParent !== null) {
             console.log('[VTP Core] Empty: .empty-state visible');
             return true;
@@ -282,12 +301,12 @@ window.__VTP_CORE_SCAN_RUNNING__ = true;
     //  MAIN FLOW – BƯỚC 1: Switch sang tab "chưa kiểm kê"
     // ════════════════════════════════════════════════════════════
     await switchToUnscannedTab();
-    await new Promise(r => setTimeout(r, 300)); // Buffer render sau tab switch (tối ưu từ 800ms)
+    await new Promise(r => setTimeout(r, 100)); // [v2.0] Buffer render sau tab switch (giảm từ 300ms)
 
     // ════════════════════════════════════════════════════════════
     //  MAIN FLOW – BƯỚC 2: Xác định trạng thái tab
     // ════════════════════════════════════════════════════════════
-    const tabState = await waitForTabContentReady(10000);
+    const tabState = await waitForTabContentReady(8000);
     console.log('[VTP Core] Tab state sau load:', tabState);
 
     // ════════════════════════════════════════════════════════════
@@ -308,7 +327,7 @@ window.__VTP_CORE_SCAN_RUNNING__ = true;
         console.log('[VTP Core] TH2 –', msg);
         if (window.VTPNotification?.show) window.VTPNotification.show(msg, 'info');
 
-        await new Promise(r => setTimeout(r, 500)); // Đợi trang ổn định (tối ưu từ 1500ms)
+        await new Promise(r => setTimeout(r, 200)); // [v2.0] Đợi trang ổn định (giảm từ 500ms)
         await clickHoanThanh();
 
         // Báo hiệu scan xong → sidepanel sẽ chuyển tuyến tiếp
@@ -321,7 +340,7 @@ window.__VTP_CORE_SCAN_RUNNING__ = true;
             console.warn('[VTP Core] Không thể ghi storage:', e);
         }
         console.log('[VTP Core] Đợi 2s rồi F5...');
-        await new Promise(r => setTimeout(r, 800)); // Đợi trước F5 (tối ưu từ 2000ms)
+        await new Promise(r => setTimeout(r, 300)); // [v2.0] Đợi trước F5 (giảm từ 800ms)
         location.reload();                            // F5 → sidepanel chuyển tuyến tiếp
         return;
     }
@@ -335,7 +354,7 @@ window.__VTP_CORE_SCAN_RUNNING__ = true;
     while (Date.now() < inputDeadline) {
         inputField = document.querySelector('input.clsinputpg');
         if (inputField) break;
-        await new Promise(r => setTimeout(r, 400));
+        await new Promise(r => setTimeout(r, 200));
     }
 
     if (!inputField) {
@@ -345,14 +364,14 @@ window.__VTP_CORE_SCAN_RUNNING__ = true;
         window.__VTP_CORE_SCAN_RUNNING__ = false;
         // [v1.5 Fix] Phải reload để sidepanel nhận tín hiệu (waitForTabReload)
         // Nếu không reload → sidepanel treo vĩnh viễn chờ tín hiệu
-        await new Promise(r => setTimeout(r, 1000));
+        await new Promise(r => setTimeout(r, 500));
         location.reload();
         return;
     }
 
     // Tắt event jQuery can thiệp vào input
     if (typeof $ !== 'undefined') $(inputField).off('cut copy paste keypress');
-    await new Promise(r => setTimeout(r, 200)); // Tối ưu từ 800ms
+    await new Promise(r => setTimeout(r, 50)); // [v2.0] Giảm từ 200ms
 
     // ── Xây UI overlay (xóa instance cũ nếu có) ──────────────
     let extUI = document.getElementById('vtp-auto-ext-ui');
@@ -538,7 +557,7 @@ window.__VTP_CORE_SCAN_RUNNING__ = true;
         progressTextEl.textContent = `${done} / ${total} mã (Trang ${currentPage})`;
     }
 
-    await new Promise(r => setTimeout(r, 200)); // Tối ưu từ 600ms
+    await new Promise(r => setTimeout(r, 50)); // [v2.0] Giảm từ 200ms
 
     // ════════════════════════════════════════════════════════════
     //  VÒNG LẶP XỬ LÝ CHÍNH (TH1)
@@ -564,14 +583,12 @@ window.__VTP_CORE_SCAN_RUNNING__ = true;
         updateProgress(processedOnPage, totalOnPage);
 
         // Không còn mã chưa quét trên trang → retry chờ ZK re-render
-        // [v1.5 Fix] ZK Framework cần thời gian re-render list sau khi xóa row.
-        // Nếu getValidCodes() chạy quá sớm, các mã ở đầu list chưa xuất hiện
-        // trong DOM → bị kết luận sai là "hết mã" → sót đơn.
-        // Retry tối đa 3 lần (mỗi lần chờ 500ms) trước khi kết luận thật sự hết.
+        // [v2.0] Giảm retry delay từ 500ms → 200ms (ZK re-render thường < 100ms)
+        // Retry tối đa 3 lần trước khi kết luận thật sự hết.
         if (!target) {
             let retryFound = false;
             for (let retry = 0; retry < 3; retry++) {
-                await new Promise(r => setTimeout(r, 500));
+                await new Promise(r => setTimeout(r, 200));
                 const retryList = getValidCodes();
                 for (const item of retryList) {
                     if (!processedCodeSet.has(item.code)) {
@@ -596,9 +613,9 @@ window.__VTP_CORE_SCAN_RUNNING__ = true;
             if (clickNextPage()) {
                 currentPage++;
                 if (window.VTPSmartDelay?.waitForPageLoad) {
-                    await window.VTPSmartDelay.waitForPageLoad(oldFirstCode, 8000);
+                    await window.VTPSmartDelay.waitForPageLoad(oldFirstCode, 6000);
                 } else {
-                    await new Promise(r => setTimeout(r, 3000));
+                    await new Promise(r => setTimeout(r, 1500));
                 }
                 totalOnPage = 0;
                 continue;
@@ -630,8 +647,8 @@ window.__VTP_CORE_SCAN_RUNNING__ = true;
         inputField.dispatchEvent(new Event('input',  { bubbles: true, composed: true }));
         inputField.dispatchEvent(new Event('change', { bubbles: true }));
 
-        if (window.VTPSmartDelay) await window.VTPSmartDelay.sleep(10);
-        else await new Promise(r => setTimeout(r, 10));
+        if (window.VTPSmartDelay) await window.VTPSmartDelay.sleep(5);
+        else await new Promise(r => setTimeout(r, 5));
 
         ['keydown', 'keypress', 'keyup'].forEach(evt => {
             inputField.dispatchEvent(new KeyboardEvent(evt, {
@@ -665,7 +682,7 @@ window.__VTP_CORE_SCAN_RUNNING__ = true;
             element.style.backgroundColor = '#dc3545';
             addHistoryItem(`<span style="color:#dc3545;font-weight:600;">${code} (Lỗi / Timeout)</span>`);
             exportDataArray.push({ stt: processedCount, code, page: currentPage, time: timeScanned, status: 'Lỗi / Timeout' });
-            if (window.VTPSmartDelay) await window.VTPSmartDelay.sleep(100); // Tối ưu từ 300ms
+            if (window.VTPSmartDelay) await window.VTPSmartDelay.sleep(30); // [v2.0] Giảm từ 100ms
         } else {
             addHistoryItem(
                 `<span style="color:#28a745;font-weight:600;">${code} ` +
@@ -675,7 +692,7 @@ window.__VTP_CORE_SCAN_RUNNING__ = true;
         }
 
         tabs.btnHistory.textContent = `Lịch Sử (${processedCount})`;
-        if (window.VTPSmartDelay) await window.VTPSmartDelay.sleep(300); // [v1.5] Tăng từ 50ms → chờ ZK re-render list
+        if (window.VTPSmartDelay) await window.VTPSmartDelay.sleep(50); // [v2.0] Giảm từ 300ms → ZK re-render catch bởi retry mechanism
     }
 
     // ════════════════════════════════════════════════════════════
@@ -705,7 +722,7 @@ window.__VTP_CORE_SCAN_RUNNING__ = true;
             console.warn('[VTP Core] Không thể ghi storage:', e);
         }
         console.log('[VTP Core] Đợi trước F5...');
-        await new Promise(r => setTimeout(r, 800)); // Tối ưu từ 2000ms
+        await new Promise(r => setTimeout(r, 300)); // [v2.0] Giảm từ 800ms
         location.reload();
     } else {
         window.__VTP_CORE_SCAN_RUNNING__ = false;

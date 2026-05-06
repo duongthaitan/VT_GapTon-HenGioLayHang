@@ -1,8 +1,9 @@
 // ============================================================
 //  VTP Tool – Smart Delay Module
-//  v1.1: Thu hẹp MutationObserver options để giảm CPU
-//        - Bỏ characterData (không cần thiết để phát hiện mã thay đổi)
-//        - Dùng attributes: false để tránh trigger từ style/class updates
+//  v1.2: Tối ưu tốc độ — giảm timeout mặc định
+//        - waitUntilCodeProcessed: 15s → 12s
+//        - waitForPageLoad: 10s → 6s
+//        - Bỏ characterData/attributes để giảm CPU
 // ============================================================
 window.VTPSmartDelay = {
 
@@ -10,7 +11,7 @@ window.VTPSmartDelay = {
      * Chờ cho đến khi mã được xử lý xong (phần tử biến mất hoặc thay đổi)
      * Dùng MutationObserver thay vì polling timer
      */
-    waitUntilCodeProcessed(targetCode, targetElement, maxWaitTime = 15000) {
+    waitUntilCodeProcessed(targetCode, targetElement, maxWaitTime = 12000) {
         return new Promise((resolve) => {
             const checkStatus = () => {
                 // Kiểm tra phần tử đã bị xóa khỏi DOM chưa
@@ -67,7 +68,7 @@ window.VTPSmartDelay = {
     /**
      * Chờ trang lật xong (first cell thay đổi nội dung)
      */
-    waitForPageLoad(oldFirstCode, maxWait = 10000) {
+    waitForPageLoad(oldFirstCode, maxWait = 6000) {
         return new Promise((resolve) => {
             const checkChanged = () => {
                 const firstCell = document.querySelector('.z-listcell-content');
