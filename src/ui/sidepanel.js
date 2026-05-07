@@ -169,9 +169,47 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // ════════════════════════════════════════
     //  TAB 1 — SỬA GIỜ
+    //  [v3.0] Vòng lặp chạy ở SIDEPANEL (extension page)
+    //  → Không bị Chrome throttle khi chuyển tab
+    //  → Content script chỉ xử lý 1 đơn/lần, trả kết quả qua storage
     // ════════════════════════════════════════
     const startChinhGioBtn = document.getElementById('startChinhGioBtn');
     const stopChinhGioBtn  = document.getElementById('stopChinhGioBtn');
+
+    // Helper: chờ content script báo xong 1 đơn qua storage
+    function waitForChinhGioStepDone(timeoutMs = 120000) {
+        return new Promise((resolve) => {
+            let resolved = false;
+
+            const deadline = setTimeout(() => {
+                if (resolved) return;
+                resolved = true;
+                chrome.storage.onChanged.removeListener(listener);
+                resolve({ status: 'timeout' });
+            }, timeoutMs);
+
+            function listener(changes, ns) {
+                if (ns !== 'local' || resolved) return;
+                if (changes.__VTP_CHINHGIO_STEP_DONE__?.newValue) {
+                    resolved = true;
+                    clearTimeout(deadline);
+                    chrome.storage.onChanged.removeListener(listener);
+                    resolve(changes.__VTP_CHINHGIO_STEP_DONE__.newValue);
+                }
+            }
+            chrome.storage.onChanged.addListener(listener);
+
+            // Backup check (signal có thể đã set trước khi listener đăng ký)
+            chrome.storage.local.get('__VTP_CHINHGIO_STEP_DONE__', (data) => {
+                if (data.__VTP_CHINHGIO_STEP_DONE__ && !resolved) {
+                    resolved = true;
+                    clearTimeout(deadline);
+                    chrome.storage.onChanged.removeListener(listener);
+                    resolve(data.__VTP_CHINHGIO_STEP_DONE__);
+                }
+            });
+        });
+    }
 
     startChinhGioBtn.addEventListener('click', async () => {
         const bills = parseBills();
@@ -188,9 +226,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        // Fix inject trùng: Disable ngay lập tức trước khi inject
+        const mainTabId = tab.id;
+
+        // Disable UI
         startChinhGioBtn.disabled  = true;
-        startChinhGioBtn.innerHTML = BTN_HTML.startRunning; // Fix #5
+        startChinhGioBtn.innerHTML = BTN_HTML.startRunning;
 
         await chrome.storage.local.set({
             billList:     bills,
@@ -200,19 +240,69 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
         updateProgressUI(0, bills.length);
 
-        try {
-            await chrome.scripting.executeScript({
-                target: { tabId: tab.id },
-                files: ['src/shared/notification.js', 'src/modules/chinhgio/chinhgio_content.js']
-            });
-        } catch (e) {
-            console.error('[VTP] Lỗi inject script:', e);
-            await chrome.storage.local.set({ isRunning: false });
-            // Re-enable nút nếu lỗi
-            startChinhGioBtn.disabled  = false;
-            startChinhGioBtn.innerHTML = BTN_HTML.startPlay; // Fix #5
-            alert('Không thể chạy script. Hãy đảm bảo bạn đang mở đúng trang ViettelPost!');
+        // ── Vòng lặp chính — chạy ở sidepanel (KHÔNG bị throttle) ──
+        const skipList = [];
+
+        for (let i = 0; i < bills.length; i++) {
+            // Kiểm tra user bấm Dừng
+            const state = await chrome.storage.local.get(['isRunning']);
+            if (!state.isRunning) {
+                console.log('[VTP Sửa Giờ] Người dùng bấm Dừng.');
+                break;
+            }
+
+            // Cập nhật UI trên sidepanel
+            if (statusMsg) statusMsg.textContent      = `Đang xử lý đơn ${i + 1} / ${bills.length}…`;
+            if (statusDot) statusDot.style.background = '#f59e0b';
+            updateProgressUI(i, bills.length);
+
+            // Xóa signal cũ
+            try { await chrome.storage.local.remove('__VTP_CHINHGIO_STEP_DONE__'); } catch (_) {}
+
+            // Inject content script xử lý 1 đơn
+            try {
+                await chrome.scripting.executeScript({
+                    target: { tabId: mainTabId },
+                    files: ['src/shared/notification.js', 'src/modules/chinhgio/chinhgio_content.js']
+                });
+            } catch (e) {
+                console.error('[VTP] Lỗi inject:', e);
+                skipList.push({ bill: bills[i], reason: 'Inject thất bại: ' + e.message });
+                continue;
+            }
+
+            // Chờ content script hoàn thành 1 đơn (max 2 phút)
+            const result = await waitForChinhGioStepDone(120000);
+            console.log(`[VTP Sửa Giờ] Kết quả đơn ${i + 1}:`, result.status, result.bill || '');
+
+            if (result.status === 'skipped' || result.status === 'error') {
+                skipList.push({ bill: result.bill || bills[i], reason: result.reason || 'Lỗi không xác định' });
+            }
+
+            // Cập nhật progress
+            updateProgressUI(i + 1, bills.length);
+
+            // Delay giữa các đơn — chạy ở sidepanel → KHÔNG bị throttle!
+            if (i < bills.length - 1) {
+                await new Promise(r => setTimeout(r, 1000));
+            }
         }
+
+        // ── Hoàn tất ──
+        await chrome.storage.local.set({ isRunning: false });
+
+        if (skipList.length === 0) {
+            if (statusMsg) statusMsg.textContent      = '✅ Đã hoàn thành!';
+            if (statusDot) statusDot.style.background = '#22c55e';
+        } else {
+            if (statusMsg) statusMsg.textContent      = `⚠️ Xong — Bỏ qua ${skipList.length} đơn`;
+            if (statusDot) statusDot.style.background = '#f59e0b';
+            console.warn('[VTP Sửa Giờ] Đơn bị bỏ qua:', skipList);
+        }
+
+        // Reset UI
+        startChinhGioBtn.disabled  = false;
+        startChinhGioBtn.innerHTML = BTN_HTML.startPlay;
     });
 
     stopChinhGioBtn.addEventListener('click', async () => {
@@ -220,7 +310,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (statusMsg) statusMsg.textContent      = 'Đã dừng.';
         if (statusDot) statusDot.style.background = '#6b7280';
         startChinhGioBtn.disabled  = false;
-        startChinhGioBtn.innerHTML = BTN_HTML.startPlay; // Fix #5
+        startChinhGioBtn.innerHTML = BTN_HTML.startPlay;
     });
 
     // ════════════════════════════════════════

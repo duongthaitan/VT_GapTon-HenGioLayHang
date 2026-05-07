@@ -37,13 +37,17 @@ const server = http.createServer((req, res) => {
     else if (urlPath === '/viettelpost/scan-empty') {
         filePath = path.join(__dirname, '/page3_scan_empty.html');
     }
-    // Route: /viettelpost/hoan-thanh  → page4 (test Hoàn thành)
-    else if (urlPath === '/viettelpost/hoan-thanh') {
+    // Route: /viettelpost/hoan-thanh  → page4 (test Hoàn thành / pagination)
+    else if (urlPath === '/viettelpost/hoan-thanh' || urlPath === '/viettelpost/pagination') {
         filePath = path.join(__dirname, '/page4_hoan_thanh.html');
     }
     // Route: /tests/kiemke-modules → test runner cho module kiểm kê
     else if (urlPath === '/tests/kiemke-modules') {
         filePath = path.join(__dirname, '/kiemke_modules_test.html');
+    }
+    // Route: /viettelpost/test-phieugui-bug → test bug fix mã phiếu gửi + td-empty
+    else if (urlPath === '/viettelpost/test-phieugui-bug') {
+        filePath = path.join(__dirname, '/page5_phieugui_bug.html');
     } else {
         filePath = path.join(__dirname, urlPath);
     }

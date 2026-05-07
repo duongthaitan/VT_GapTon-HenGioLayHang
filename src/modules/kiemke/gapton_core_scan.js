@@ -152,12 +152,52 @@ window.__VTP_CORE_SCAN_RUNNING__ = true;
     }
 
     // ════════════════════════════════════════════════════════════
+    //  HELPER: Lấy tab panel đang active
+    //  [v2.1 FIX] ZK Framework giữ cả 2 tab trong DOM.
+    //  Chiến lược tìm panel đúng:
+    //    1. Tìm tab <li> có class z-tab-selected → lấy index
+    //       → match panel cùng index (z-tabpanel)
+    //    2. Fallback: panel visible + có listbox content
+    //    3. Kiểm tra thêm visibility/height (ZK có thể dùng
+    //       cách ẩn khác ngoài display:none)
+    // ════════════════════════════════════════════════════════════
+    function getActiveTabPanel() {
+        // Chiến lược 1: Dùng z-tab-selected index để map sang panel
+        const tabs = document.querySelectorAll('li.z-tab');
+        const panels = document.querySelectorAll('.z-tabpanel');
+        if (tabs.length > 0 && panels.length > 0) {
+            for (let i = 0; i < tabs.length; i++) {
+                if (tabs[i].classList.contains('z-tab-selected') && i < panels.length) {
+                    console.log('[VTP Core] getActiveTabPanel: matched via z-tab-selected index', i);
+                    return panels[i];
+                }
+            }
+        }
+
+        // Chiến lược 2 (fallback): panel visible + có listbox
+        for (const p of panels) {
+            const computed = getComputedStyle(p);
+            // Kiểm tra nhiều cách ẩn của ZK
+            if (computed.display === 'none') continue;
+            if (computed.visibility === 'hidden') continue;
+            if (parseInt(computed.height) === 0 && computed.overflow === 'hidden') continue;
+            if (p.querySelector('.z-listbox, .z-listcell-content')) return p;
+        }
+        return null; // Fallback → dùng document
+    }
+
+    // ════════════════════════════════════════════════════════════
     //  HELPER: Xác định tab "chưa kiểm kê" có trống không
-    //  [v2.0] Scope vào active tab panel → tránh false positive
-    //         từ tab "đã kiểm kê" (ZK giữ cả 2 tab trong DOM)
+    //  [v2.1 FIX] Sửa false positive gây bỏ qua quét mã:
+    //    - BUG CŨ: td[id$="-empty"] luôn tồn tại trong DOM ngay
+    //      cả khi listbox CÓ dữ liệu → check display không tin cậy
+    //      → tool nhảy sang TH2 (Hoàn thành) mà không quét mã
+    //    - FIX: Kiểm tra "có mã trong panel không" TRƯỚC khi kết luận
+    //      empty. Nếu có .z-listcell-content với data → KHÔNG empty.
     //  Ưu tiên:
+    //    0. GUARD: Nếu panel có ≥1 listcell chứa mã hợp lệ → NOT empty
     //    1. Fast-path: Text "Đã kiểm kê hết" trong active panel
-    //    2. ZK: td[id$="-empty"] có display='table-cell'
+    //    2. ZK: td[id$="-empty"] có computed display='table-cell'
     //    3. ZK: .z-listbox-emptybody-content bên trong <td> hiển thị
     //    4. Fallback: .empty-state class (test server)
     // ════════════════════════════════════════════════════════════
@@ -165,8 +205,18 @@ window.__VTP_CORE_SCAN_RUNNING__ = true;
         // Scope: chỉ kiểm tra trong active tab panel
         const scope = getActiveTabPanel() || document;
 
+        // ★ GUARD (v2.1): Nếu panel CÓ ít nhất 1 ô listcell chứa text ≥ 8 ký tự
+        // thì chắc chắn KHÔNG TRỐNG — tránh false positive từ td[id$="-empty"]
+        const cells = scope.querySelectorAll('.z-listcell-content');
+        for (const cell of cells) {
+            const text = (cell.innerText || '').trim().replace(/\s+/g, '');
+            if (text.length >= 8 && /^[a-zA-Z0-9.\-_\/+]{8,50}$/.test(text)) {
+                console.log('[VTP Core] isUnscannedTabEmpty: GUARD — found code', text.slice(0, 20), '→ NOT empty');
+                return false;
+            }
+        }
+
         // Ưu tiên 1 (FAST PATH): Text "Đã kiểm kê hết" — match chính xác thông báo VTP
-        // HTML mẫu: <td id="xxx-empty" style="display:table-cell"><div class="z-listbox-emptybody-content">Đã kiểm kê hết...</div></td>
         const emptyContent = scope.querySelector('.z-listbox-emptybody-content');
         if (emptyContent) {
             const text = (emptyContent.textContent || '').trim();
@@ -176,12 +226,13 @@ window.__VTP_CORE_SCAN_RUNNING__ = true;
             }
         }
 
-        // Ưu tiên 2: td[id$="-empty"] có display:table-cell (ZK standard)
+        // Ưu tiên 2: td[id$="-empty"] có computed display THỰC SỰ là table-cell
+        // [v2.1 FIX] Chỉ dùng getComputedStyle (không dùng inline style — unreliable)
         const emptyTd = scope.querySelector('td[id$="-empty"]');
         if (emptyTd) {
-            const tdDisplay = emptyTd.style.display || getComputedStyle(emptyTd).display;
-            if (tdDisplay === 'table-cell' || (tdDisplay !== 'none' && tdDisplay !== '')) {
-                console.log('[VTP Core] Empty: td[id$="-empty"] visible, text:', emptyTd.textContent.trim().slice(0, 60));
+            const computedDisplay = getComputedStyle(emptyTd).display;
+            if (computedDisplay === 'table-cell') {
+                console.log('[VTP Core] Empty: td[id$="-empty"] computed display=table-cell, text:', emptyTd.textContent.trim().slice(0, 60));
                 return true;
             }
         }
@@ -190,9 +241,9 @@ window.__VTP_CORE_SCAN_RUNNING__ = true;
         if (emptyContent) {
             const parentTd = emptyContent.closest('td');
             if (parentTd) {
-                const isHidden = parentTd.style.display === 'none' || getComputedStyle(parentTd).display === 'none';
-                if (!isHidden) {
-                    console.log('[VTP Core] Empty: .z-listbox-emptybody-content visible');
+                const computedDisplay = getComputedStyle(parentTd).display;
+                if (computedDisplay !== 'none') {
+                    console.log('[VTP Core] Empty: .z-listbox-emptybody-content parent td display=' + computedDisplay);
                     return true;
                 }
             } else {
@@ -209,23 +260,6 @@ window.__VTP_CORE_SCAN_RUNNING__ = true;
         }
 
         return false;
-    }
-
-    // ════════════════════════════════════════════════════════════
-    //  HELPER: Lấy tab panel đang active
-    //  ZK Framework giữ cả 2 tab trong DOM → phải scope query
-    //  để CHỈ đọc mã từ tab "chưa kiểm kê", bỏ qua "đã kiểm kê"
-    // ════════════════════════════════════════════════════════════
-    function getActiveTabPanel() {
-        const panels = document.querySelectorAll('.z-tabpanel');
-        for (const p of panels) {
-            if (p.style.display === 'none') continue;
-            const computed = getComputedStyle(p).display;
-            if (computed === 'none') continue;
-            // Panel phải có nội dung listbox
-            if (p.querySelector('.z-listbox, .z-listcell-content')) return p;
-        }
-        return null; // Fallback → dùng document
     }
 
     // ════════════════════════════════════════════════════════════

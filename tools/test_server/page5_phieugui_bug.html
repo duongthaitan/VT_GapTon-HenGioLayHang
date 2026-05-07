@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <title>VTP Test – Bug Fix: Mã Phiếu Gửi + td-empty false positive</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f4f6f9; }
+        .vtp-header { background: #ee0033; color: white; padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; }
+        .vtp-header h1 { font-size: 18px; }
+        .test-badge { background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+        .main-content { max-width: 960px; margin: 20px auto; padding: 0 20px; }
+        .info-banner { background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 14px 18px; margin-bottom: 16px; font-size: 13px; color: #856404; }
+
+        /* ZK Tabs */
+        .z-tabs { display: flex; list-style: none; border-bottom: 2px solid #dee2e6; }
+        .z-tab { padding: 12px 20px; cursor: pointer; border: 1px solid transparent; border-bottom: none; font-size: 14px; font-weight: 500; color: #555; background: #f8f9fa; border-radius: 8px 8px 0 0; margin-right: 2px; }
+        .z-tab.z-tab-selected { background: white; color: #ee0033; border-color: #dee2e6; font-weight: 700; position: relative; }
+        .z-tab.z-tab-selected::after { content: ''; position: absolute; bottom: -2px; left: 0; right: 0; height: 2px; background: white; }
+        .z-tab-content { text-decoration: none; color: inherit; }
+
+        /* ZK Tabpanel */
+        .z-tabpanel { background: white; border: 1px solid #dee2e6; border-top: none; padding: 20px; min-height: 200px; }
+        .z-tabpanel[style*="display: none"] { /* ZK hidden */ }
+
+        /* ZK Listbox */
+        .z-listbox { width: 100%; }
+        .z-listbox table { width: 100%; border-collapse: collapse; }
+        .z-listbox th { background: #e8f5e9; padding: 10px 14px; text-align: left; font-size: 13px; font-weight: 600; color: #2e7d32; border-bottom: 2px solid #c8e6c9; }
+        .z-listbox tr { border-bottom: 1px solid #f0f0f0; }
+        .z-listcell-content { padding: 10px 14px; font-size: 14px; }
+        .z-listbox-emptybody-content { padding: 40px; text-align: center; color: #6c757d; font-size: 15px; }
+
+        /* Input scan */
+        input.clsinputpg { width: 100%; max-width: 400px; padding: 10px 14px; border: 2px solid #00857f; border-radius: 6px; font-size: 14px; margin-bottom: 16px; }
+
+        /* Test Results */
+        .test-results { margin-top: 20px; background: #1e1e2e; border-radius: 8px; padding: 16px 20px; color: #cdd6f4; font-family: 'Cascadia Code', monospace; font-size: 13px; max-height: 400px; overflow-y: auto; }
+        .test-pass { color: #a6e3a1; font-weight: 700; }
+        .test-fail { color: #f38ba8; font-weight: 700; }
+        .test-info { color: #89b4fa; }
+        .test-warn { color: #f9e2af; }
+        .test-header { color: #cba6f7; font-weight: 700; font-size: 15px; border-bottom: 1px solid #45475a; padding-bottom: 8px; margin-bottom: 8px; }
+
+        .action-bar { margin-top: 16px; padding-top: 12px; border-top: 1px solid #dee2e6; }
+        .z-button-finish { padding: 10px 24px; background: #ee0033; color: white; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; }
+
+        .summary-box { margin-top: 16px; padding: 16px 20px; border-radius: 8px; font-size: 15px; font-weight: 700; text-align: center; }
+        .summary-pass { background: #d4edda; color: #155724; border: 2px solid #28a745; }
+        .summary-fail { background: #f8d7da; color: #721c24; border: 2px solid #dc3545; }
+    </style>
+</head>
+<body>
+
+<div class="vtp-header">
+    <h1>ViettelPost – Kiểm Kê Bưu Phẩm</h1>
+    <span class="test-badge">🧪 TEST: Mã Phiếu Gửi + Bug td-empty</span>
+</div>
+
+<div class="main-content">
+    <div class="info-banner">
+        ⚠️ <strong>Trang test này mô phỏng chính xác bug:</strong>
+        <code>td[id$="-empty"]</code> luôn tồn tại trong DOM (giống VTP thật) ngay cả khi bảng CÓ dữ liệu mã phiếu gửi.
+        Code cũ sẽ false positive → bỏ qua quét mã. Code mới (v2.1) phải phát hiện có mã → NOT empty.
+    </div>
+
+    <!-- Scan Input -->
+    <input class="clsinputpg" placeholder="Quét hoặc nhập mã kiện..." id="scanInput">
+
+    <!-- ZK Tabs -->
+    <ul class="z-tabs">
+        <li class="z-tab" id="tabDone">
+            <a class="z-tab-content"><span class="z-tab-text">Bưu phẩm đã kiểm kê</span></a>
+        </li>
+        <li class="z-tab z-tab-selected" id="tabPending">
+            <a class="z-tab-content"><span class="z-tab-text" title="Bưu phẩm chưa kiểm kê">Bưu phẩm chưa kiểm kê</span></a>
+        </li>
+    </ul>
+
+    <!-- Tab 1: Đã kiểm kê (ẩn) -->
+    <div class="z-tabpanel" id="panelDone" style="display: none;">
+        <div class="z-listbox">
+            <table>
+                <thead><tr><th>Mã phiếu gửi</th><th>Trạng thái</th></tr></thead>
+                <tbody>
+                    <tr><td class="z-listcell-content">VTP111111111</td><td class="z-listcell-content">Đã kiểm kê</td></tr>
+                </tbody>
+            </table>
+            <!-- ★ BUG TRIGGER: td-empty trong tab "đã kiểm kê" — CÓ THỂ GÂY FALSE POSITIVE nếu scope sai -->
+            <td id="panelDone-listbox-empty" style="display: table-cell;">
+                <div class="z-listbox-emptybody-content">Đã kiểm kê hết các bưu phẩm</div>
+            </td>
+        </div>
+    </div>
+
+    <!-- Tab 2: Chưa kiểm kê (hiện) -->
+    <div class="z-tabpanel" id="panelPending">
+        <p style="font-size: 12px; color: #888; margin-bottom: 12px;">
+            Danh sách này chỉ hiện thị 1 số phiếu gửi nhất định, không phải toàn bộ phiếu gửi tồn trên tuyến.
+        </p>
+        <div class="z-listbox" id="mainListbox">
+            <table>
+                <thead><tr>
+                    <th>Mã phiếu gửi</th><th>Trạng thái</th><th>Tên tuyến phát</th>
+                    <th>Ngày phân công</th><th>Thu hộ</th><th>Tác động</th>
+                </tr></thead>
+                <tbody id="codeListBody">
+                    <tr class="code-row"><td class="z-listcell-content">138309561199</td><td class="z-listcell-content">5</td><td class="z-listcell-content">Nguyễn Minh Luân (thn_tuyen2)</td><td class="z-listcell-content">08/04/2026 19:55:14</td><td class="z-listcell-content">130,000</td><td class="z-listcell-content">Đang tìm kiểm</td></tr>
+                    <tr class="code-row"><td class="z-listcell-content">138108364996</td><td class="z-listcell-content">5</td><td class="z-listcell-content">Nguyễn Minh Luân (thn_tuyen2)</td><td class="z-listcell-content">08/04/2026 19:55:42</td><td class="z-listcell-content">120,000</td><td class="z-listcell-content">Đang tìm kiểm</td></tr>
+                    <tr class="code-row"><td class="z-listcell-content">137970830359</td><td class="z-listcell-content">5</td><td class="z-listcell-content">Nguyễn Minh Luân (thn_tuyen2)</td><td class="z-listcell-content">08/04/2026 19:56:12</td><td class="z-listcell-content">300,000</td><td class="z-listcell-content">Không thấy bưu phẩm</td></tr>
+                    <tr class="code-row"><td class="z-listcell-content">PKE1383491381</td><td class="z-listcell-content">5</td><td class="z-listcell-content">Nguyễn Minh Luân (thn_tuyen2)</td><td class="z-listcell-content">08/04/2026 19:57:40</td><td class="z-listcell-content">100,000</td><td class="z-listcell-content">Đang tìm kiểm</td></tr>
+                    <tr class="code-row"><td class="z-listcell-content">BID-28199</td><td class="z-listcell-content">5</td><td class="z-listcell-content">Nguyễn Minh Luân (thn_tuyen2)</td><td class="z-listcell-content">08/04/2026 19:57:55</td><td class="z-listcell-content">0</td><td class="z-listcell-content">Không thấy bưu phẩm</td></tr>
+                    <tr class="code-row"><td class="z-listcell-content">138813134658</td><td class="z-listcell-content">6</td><td class="z-listcell-content">Nguyễn Minh Luân (thn_tuyen2)</td><td class="z-listcell-content">10/04/2026 08:50:24</td><td class="z-listcell-content">500,000</td><td class="z-listcell-content">Đang tìm kiểm</td></tr>
+                    <tr class="code-row"><td class="z-listcell-content">VTPVN9036360005</td><td class="z-listcell-content">6</td><td class="z-listcell-content">Nguyễn Minh Luân (thn_tuyen2)</td><td class="z-listcell-content">10/04/2026 15:51:18</td><td class="z-listcell-content">55,999</td><td class="z-listcell-content">Đang tìm kiểm</td></tr>
+                    <tr class="code-row"><td class="z-listcell-content">VTPVN9035640804</td><td class="z-listcell-content">6</td><td class="z-listcell-content">Nguyễn Minh Luân (thn_tuyen2)</td><td class="z-listcell-content">11/04/2026 07:43:08</td><td class="z-listcell-content">55,999</td><td class="z-listcell-content">Đang tìm kiểm</td></tr>
+                </tbody>
+            </table>
+
+            <!-- ★★★ BUG TRIGGER: td[id$="-empty"] LUÔN tồn tại trong DOM (giống VTP thật) ★★★ -->
+            <!-- ZK giữ element này ngay cả khi listbox CÓ dữ liệu -->
+            <!-- Code cũ: tdDisplay !== 'none' && tdDisplay !== '' → TRUE → false positive! -->
+            <td id="mainListbox-empty" style="">
+                <div class="z-listbox-emptybody-content">Không có bưu phẩm chưa kiểm kê</div>
+            </td>
+        </div>
+
+        <!-- Action Bar -->
+        <div class="action-bar">
+            <button class="z-button-finish"><span class="z-label">Hoàn thành</span></button>
+        </div>
+    </div>
+
+    <!-- Test Results -->
+    <div class="test-results" id="testResults">
+        <div class="test-header">🧪 Kết Quả Test — Bug Fix v2.1</div>
+    </div>
+    <div id="summaryBox"></div>
+</div>
+
+<script>
+(() => {
+    'use strict';
+
+    const results = document.getElementById('testResults');
+    const summaryBox = document.getElementById('summaryBox');
+    let passed = 0, failed = 0;
+
+    function log(msg, cls = '') {
+        const div = document.createElement('div');
+        div.className = cls;
+        div.textContent = msg;
+        results.appendChild(div);
+    }
+
+    function assert(condition, testName) {
+        if (condition) {
+            passed++;
+            log(`  ✅ PASS: ${testName}`, 'test-pass');
+        } else {
+            failed++;
+            log(`  ❌ FAIL: ${testName}`, 'test-fail');
+        }
+    }
+
+    // ══════════════════════════════════════
+    //  Copy các hàm đã FIX từ gapton_core_scan.js v2.1
+    // ══════════════════════════════════════
+
+    function getActiveTabPanel() {
+        const tabs = document.querySelectorAll('li.z-tab');
+        const panels = document.querySelectorAll('.z-tabpanel');
+        if (tabs.length > 0 && panels.length > 0) {
+            for (let i = 0; i < tabs.length; i++) {
+                if (tabs[i].classList.contains('z-tab-selected') && i < panels.length) {
+                    return panels[i];
+                }
+            }
+        }
+        for (const p of panels) {
+            const computed = getComputedStyle(p);
+            if (computed.display === 'none') continue;
+            if (computed.visibility === 'hidden') continue;
+            if (parseInt(computed.height) === 0 && computed.overflow === 'hidden') continue;
+            if (p.querySelector('.z-listbox, .z-listcell-content')) return p;
+        }
+        return null;
+    }
+
+    function getValidCodes() {
+        const container = getActiveTabPanel() || document;
+        const cells = container.querySelectorAll('.z-listcell-content');
+        const validPrefixes = ['SHOPEE', 'VTP', 'VGI', 'PKE', 'KMS', 'PSL', 'TPO'];
+        const data = [];
+        const seen = new Set();
+        cells.forEach(cell => {
+            const code = cell.innerText.trim().replace(/\s+/g, '');
+            if (code.length >= 8 && !seen.has(code)) {
+                const isStandard = /^[a-zA-Z0-9.\-_\/+]{8,50}$/.test(code);
+                const hasPrefix = validPrefixes.some(p => code.toUpperCase().startsWith(p));
+                if (isStandard || hasPrefix) {
+                    seen.add(code);
+                    data.push({ element: cell, code });
+                }
+            }
+        });
+        return data;
+    }
+
+    // ── Code CŨ (v2.0 — BUG) ──
+    function isUnscannedTabEmpty_OLD() {
+        const scope = getActiveTabPanel() || document;
+        const emptyContent = scope.querySelector('.z-listbox-emptybody-content');
+        if (emptyContent) {
+            const text = (emptyContent.textContent || '').trim();
+            if (text.includes('Đã kiểm kê hết')) return true;
+        }
+        const emptyTd = scope.querySelector('td[id$="-empty"]');
+        if (emptyTd) {
+            const tdDisplay = emptyTd.style.display || getComputedStyle(emptyTd).display;
+            if (tdDisplay === 'table-cell' || (tdDisplay !== 'none' && tdDisplay !== '')) {
+                return true; // ← FALSE POSITIVE HERE
+            }
+        }
+        if (emptyContent) {
+            const parentTd = emptyContent.closest('td');
+            if (parentTd) {
+                const isHidden = parentTd.style.display === 'none' || getComputedStyle(parentTd).display === 'none';
+                if (!isHidden) return true;
+            } else { return true; }
+        }
+        return false;
+    }
+
+    // ── Code MỚI (v2.1 — FIX) ──
+    function isUnscannedTabEmpty_NEW() {
+        const scope = getActiveTabPanel() || document;
+        // ★ GUARD: kiểm tra có mã hợp lệ TRƯỚC
+        const cells = scope.querySelectorAll('.z-listcell-content');
+        for (const cell of cells) {
+            const text = (cell.innerText || '').trim().replace(/\s+/g, '');
+            if (text.length >= 8 && /^[a-zA-Z0-9.\-_\/+]{8,50}$/.test(text)) {
+                return false; // CÓ MÃ → KHÔNG TRỐNG
+            }
+        }
+        const emptyContent = scope.querySelector('.z-listbox-emptybody-content');
+        if (emptyContent) {
+            const text = (emptyContent.textContent || '').trim();
+            if (text.includes('Đã kiểm kê hết')) return true;
+        }
+        const emptyTd = scope.querySelector('td[id$="-empty"]');
+        if (emptyTd) {
+            const computedDisplay = getComputedStyle(emptyTd).display;
+            if (computedDisplay === 'table-cell') return true;
+        }
+        if (emptyContent) {
+            const parentTd = emptyContent.closest('td');
+            if (parentTd) {
+                if (getComputedStyle(parentTd).display !== 'none') return true;
+            } else { return true; }
+        }
+        return false;
+    }
+
+    // ══════════════════════════════════════
+    //  RUN TESTS
+    // ══════════════════════════════════════
+
+    log('\n📋 TEST 1: getActiveTabPanel() — Scope đúng panel', 'test-info');
+    const activePanel = getActiveTabPanel();
+    assert(activePanel !== null, 'getActiveTabPanel() trả về panel (không null)');
+    assert(activePanel?.id === 'panelPending', 'Panel đúng = panelPending (tab "chưa kiểm kê")');
+
+    log('\n📋 TEST 2: getValidCodes() — Nhận diện mã phiếu gửi', 'test-info');
+    const codes = getValidCodes();
+    log(`   → Tìm thấy ${codes.length} mã`, 'test-info');
+    assert(codes.length === 8, `Phải tìm đủ 8 mã phiếu gửi (thực tế: ${codes.length})`);
+
+    const expectedCodes = ['138309561199', '138108364996', '137970830359', 'PKE1383491381', 'BID-28199', '138813134658', 'VTPVN9036360005', 'VTPVN9035640804'];
+    const foundCodes = codes.map(c => c.code);
+    for (const expected of expectedCodes) {
+        assert(foundCodes.includes(expected), `Tìm thấy mã: ${expected}`);
+    }
+
+    log('\n📋 TEST 3: Lọc đúng — Không lấy dữ liệu cột khác', 'test-info');
+    const noiseValues = ['5', '6', '130,000', '120,000', '08/04/202619:55:14', 'Đangtìmkiểm', 'Khôngthấybưuphẩm'];
+    for (const noise of noiseValues) {
+        assert(!foundCodes.includes(noise), `Không lấy nhầm: "${noise}"`);
+    }
+
+    log('\n📋 TEST 4: isUnscannedTabEmpty() — CODE CŨ (v2.0 bug)', 'test-info');
+    const oldResult = isUnscannedTabEmpty_OLD();
+    log(`   → Code CŨ trả về: ${oldResult}`, oldResult ? 'test-fail' : 'test-pass');
+    assert(oldResult === true, 'Code CŨ trả về TRUE (= false positive, đây là BUG đã biết)');
+
+    log('\n📋 TEST 5: isUnscannedTabEmpty() — CODE MỚI (v2.1 fix)', 'test-info');
+    const newResult = isUnscannedTabEmpty_NEW();
+    log(`   → Code MỚI trả về: ${newResult}`, newResult ? 'test-fail' : 'test-pass');
+    assert(newResult === false, 'Code MỚI trả về FALSE (= có mã, không trống) ← ĐÃ FIX');
+
+    log('\n📋 TEST 6: Kịch bản thật sự trống (xóa hết mã)', 'test-info');
+    // Tạm xóa tất cả code rows
+    const rows = document.querySelectorAll('#codeListBody .code-row');
+    const parent = document.getElementById('codeListBody');
+    const savedHTML = parent.innerHTML;
+    parent.innerHTML = '';
+    // Set empty td visible
+    const emptyTd = document.getElementById('mainListbox-empty');
+    emptyTd.style.display = 'table-cell';
+
+    const emptyNewResult = isUnscannedTabEmpty_NEW();
+    assert(emptyNewResult === true, 'Khi thật sự trống → code MỚI trả về TRUE (đúng)');
+
+    const emptyCodesCount = getValidCodes().length;
+    assert(emptyCodesCount === 0, `getValidCodes() trả về 0 mã khi trống (thực tế: ${emptyCodesCount})`);
+
+    // Restore
+    parent.innerHTML = savedHTML;
+    emptyTd.style.display = '';
+
+    log('\n📋 TEST 7: waitForTabContentReady simulation', 'test-info');
+    // Simulate: check empty trước, nếu false → check codes
+    const simEmpty = isUnscannedTabEmpty_NEW();
+    const simCodes = getValidCodes();
+    let simResult;
+    if (simEmpty) simResult = 'empty';
+    else if (simCodes.length > 0) simResult = 'has_codes';
+    else simResult = 'timeout';
+    assert(simResult === 'has_codes', `waitForTabContentReady → "${simResult}" (phải là "has_codes")`);
+
+    log('\n📋 TEST 8: Scan input tồn tại', 'test-info');
+    const scanInput = document.querySelector('input.clsinputpg');
+    assert(scanInput !== null, 'input.clsinputpg tồn tại trên trang');
+
+    log('\n📋 TEST 9: Nút Hoàn thành tồn tại', 'test-info');
+    let hoanThanhBtn = null;
+    for (const el of document.querySelectorAll('span.z-label')) {
+        if ((el.textContent || '').trim() === 'Hoàn thành') { hoanThanhBtn = el; break; }
+    }
+    assert(hoanThanhBtn !== null, 'Nút "Hoàn thành" (span.z-label) tồn tại');
+
+    // ══════════════════════════════════════
+    //  SUMMARY
+    // ══════════════════════════════════════
+    const total = passed + failed;
+    log(`\n${'═'.repeat(50)}`, 'test-info');
+    log(`  KẾT QUẢ: ${passed}/${total} PASS — ${failed} FAIL`, failed > 0 ? 'test-fail' : 'test-pass');
+    log(`${'═'.repeat(50)}`, 'test-info');
+
+    const box = document.createElement('div');
+    box.className = `summary-box ${failed === 0 ? 'summary-pass' : 'summary-fail'}`;
+    box.textContent = failed === 0
+        ? `✅ ALL ${total} TESTS PASSED — Bug đã được fix thành công!`
+        : `❌ ${failed}/${total} TESTS FAILED — Còn lỗi cần sửa!`;
+    summaryBox.appendChild(box);
+})();
+</script>
+</body>
+</html>
