@@ -1025,4 +1025,337 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, 3000);
     });
 
+    // ════════════════════════════════════════
+    //  TAB 3 — GHI ĐƠN HÀNG
+    // ════════════════════════════════════════
+    const ghidonToggle         = document.getElementById('ghidonToggle');
+    const ghidonConnDot        = document.getElementById('ghidonConnDot');
+    const ghidonConnMsg        = document.getElementById('ghidonConnMsg');
+    const ghidonConnectionText = document.getElementById('ghidonConnectionText');
+    const ghidonTotalOrders    = document.getElementById('ghidonTotalOrders');
+    const ghidonTotalCOD       = document.getElementById('ghidonTotalCOD');
+    const ghidonOrderList      = document.getElementById('ghidonOrderList');
+    const ghidonPendingSection = document.getElementById('ghidonPendingSection');
+    const ghidonPendingCount   = document.getElementById('ghidonPendingCount');
+    const ghidonSyncBtn        = document.getElementById('ghidonSyncBtn');
+    const ghidonResetBtn       = document.getElementById('ghidonResetBtn');
+    const ghidonBadge          = document.getElementById('ghidonBadge');
+    // Settings
+    const ghidonSettingsToggle = document.getElementById('ghidonSettingsToggle');
+    const ghidonSettingsBody   = document.getElementById('ghidonSettingsBody');
+    const ghidonWebAppUrl      = document.getElementById('ghidonWebAppUrl');
+    const ghidonSheetId        = document.getElementById('ghidonSheetId');
+    const ghidonSheetName      = document.getElementById('ghidonSheetName');
+    const ghidonBuuTa          = document.getElementById('ghidonBuuTa');
+    const ghidonScanInterval   = document.getElementById('ghidonScanInterval');
+    const ghidonMinLen         = document.getElementById('ghidonMinLen');
+    const ghidonSoundEnabled   = document.getElementById('ghidonSoundEnabled');
+    const ghidonDuplicateCheck = document.getElementById('ghidonDuplicateCheck');
+    const ghidonSaveSettingsBtn= document.getElementById('ghidonSaveSettingsBtn');
+    const ghidonTestConnBtn    = document.getElementById('ghidonTestConnBtn');
+    const ghidonTestResult     = document.getElementById('ghidonTestResult');
+    const ghidonOpenSheetBtn   = document.getElementById('ghidonOpenSheetBtn');
+    // Account
+    const ghidonAccountBar     = document.getElementById('ghidonAccountBar');
+    const ghidonAccountIcon    = document.getElementById('ghidonAccountIcon');
+    const ghidonAccountName    = document.getElementById('ghidonAccountName');
+    const ghidonWrongAccount   = document.getElementById('ghidonWrongAccount');
+    const ghidonWrongAccountMsg= document.getElementById('ghidonWrongAccountMsg');
+
+    // ── Helper: gửi message đến background ──
+    function ghidonMsg(msg) {
+        return new Promise((resolve) => {
+            chrome.runtime.sendMessage(msg, (resp) => {
+                if (chrome.runtime.lastError) resolve({});
+                else resolve(resp || {});
+            });
+        });
+    }
+
+    // ── Helper: format tiền ──
+    function ghidonFormatMoney(amount) {
+        const num = parseInt(amount, 10) || 0;
+        if (num === 0) return '0đ';
+        return num.toLocaleString('vi-VN') + 'đ';
+    }
+
+    // ── Helper: lấy giờ từ chuỗi ──
+    function ghidonExtractTime(timeStr) {
+        if (!timeStr) return '';
+        const parts = timeStr.split(', ');
+        return parts[1] ? parts[1].substring(0, 5) : timeStr.substring(0, 5);
+    }
+
+    // ── Khởi tạo GhiĐơn tab ──
+    async function ghidonInit() {
+        await ghidonLoadSettings();
+        await ghidonLoadStats();
+        await ghidonCheckConnection();
+        await ghidonLoadAccountStatus(); // Khôi phục trạng thái account
+    }
+
+    // ── Load settings vào form ──
+    async function ghidonLoadSettings() {
+        const s = await ghidonMsg({ action: 'GHIDON_GET_SETTINGS' });
+        ghidonToggle.checked = s.ghidon_enabled !== false;
+        // Chỉ ghi đè nếu storage có giá trị — giữ nguyên HTML default nếu chưa lưu
+        if (ghidonWebAppUrl    && s.ghidon_sheetWebAppUrl) ghidonWebAppUrl.value    = s.ghidon_sheetWebAppUrl;
+        if (ghidonSheetId      && s.ghidon_sheetId)        ghidonSheetId.value      = s.ghidon_sheetId;
+        if (ghidonSheetName    && s.ghidon_sheetName)      ghidonSheetName.value    = s.ghidon_sheetName;
+        if (ghidonBuuTa        && s.ghidon_buuTaName)      ghidonBuuTa.value        = s.ghidon_buuTaName;
+        if (ghidonScanInterval && s.ghidon_scanInterval)   ghidonScanInterval.value = s.ghidon_scanInterval;
+        if (ghidonMinLen       && s.ghidon_minBarcodeLen)  ghidonMinLen.value       = s.ghidon_minBarcodeLen;
+        if (ghidonSoundEnabled)   ghidonSoundEnabled.checked   = s.ghidon_soundEnabled !== false;
+        if (ghidonDuplicateCheck) ghidonDuplicateCheck.checked = s.ghidon_duplicateCheck !== false;
+    }
+
+    // ── Load stats + render orders + pending ──
+    async function ghidonLoadStats() {
+        const s = await ghidonMsg({ action: 'GHIDON_GET_SETTINGS' });
+        const stats = s.ghidon_todayStats || {};
+        const today = new Date().toISOString().split('T')[0];
+
+        if (stats.date === today) {
+            ghidonTotalOrders.textContent = stats.count || 0;
+            ghidonTotalCOD.textContent    = ghidonFormatMoney(stats.totalCOD || 0);
+            ghidonRenderOrders(stats.orders || []);
+            // Badge on tab
+            const count = stats.count || 0;
+            if (ghidonBadge) {
+                ghidonBadge.textContent   = count > 0 ? count : 0;
+                ghidonBadge.style.display = count > 0 ? 'inline-flex' : 'none';
+            }
+        } else {
+            ghidonTotalOrders.textContent = '0';
+            ghidonTotalCOD.textContent    = '0đ';
+            ghidonRenderOrders([]);
+            if (ghidonBadge) ghidonBadge.style.display = 'none';
+        }
+
+        // Pending
+        const pending = s.ghidon_pendingOrders || [];
+        if (pending.length > 0) {
+            ghidonPendingSection.style.display = 'block';
+            ghidonPendingCount.textContent      = pending.length;
+        } else {
+            ghidonPendingSection.style.display = 'none';
+        }
+    }
+
+    // ── Render danh sách đơn ──
+    function ghidonRenderOrders(orders) {
+        if (orders.length === 0) {
+            ghidonOrderList.innerHTML = '<li class="ghidon-order-empty">Chưa có đơn nào hôm nay</li>';
+            return;
+        }
+        const recent = orders.slice(-8).reverse();
+        ghidonOrderList.innerHTML = recent.map(order => `
+            <li class="ghidon-order-item">
+                <span class="ghidon-order-code">${order.ma || '---'}</span>
+                <div class="ghidon-order-meta">
+                    ${order.cod && order.cod !== '0' ? `<span class="ghidon-order-cod">${ghidonFormatMoney(order.cod)}</span>` : ''}
+                    <span class="ghidon-order-time">${ghidonExtractTime(order.time)}</span>
+                    <span class="ghidon-order-ok">✅</span>
+                </div>
+            </li>
+        `).join('');
+    }
+
+    // ── Kiểm tra kết nối Sheet ──
+    async function ghidonCheckConnection() {
+        const s = await ghidonMsg({ action: 'GHIDON_GET_SETTINGS' });
+        if (!s.ghidon_sheetWebAppUrl) {
+            ghidonSetConnStatus('local', '💾 Chưa cấu hình Sheet — Lưu cục bộ');
+            return;
+        }
+        ghidonSetConnStatus('checking', 'Đang kiểm tra kết nối Sheet...');
+        const result = await ghidonMsg({ action: 'GHIDON_TEST_CONNECTION' });
+        if (result && result.success) {
+            ghidonSetConnStatus('connected', '🟢 Đã kết nối Google Sheet');
+        } else {
+            ghidonSetConnStatus('disconnected', `🔴 Lỗi: ${result?.error || 'Không kết nối được'}`);
+        }
+    }
+
+    function ghidonSetConnStatus(type, text) {
+        const colorMap = {
+            connected:    '#10B981',
+            disconnected: '#EE0033',
+            checking:     '#F59E0B',
+            local:        '#94A3B8',
+        };
+        const color = colorMap[type] || colorMap.local;
+        if (ghidonConnDot) { ghidonConnDot.className = 'status-dot'; ghidonConnDot.style.background = color; }
+        if (ghidonConnMsg) ghidonConnMsg.textContent = text;
+        if (ghidonConnectionText) ghidonConnectionText.textContent = text;
+    }
+
+    // ── Toggle enable/disable ──
+    if (ghidonToggle) {
+        ghidonToggle.addEventListener('change', async () => {
+            const enabled = ghidonToggle.checked;
+            await chrome.storage.local.set({ ghidon_enabled: enabled });
+            // Gửi tới content script trên tab active
+            try {
+                const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+                if (tab) await chrome.tabs.sendMessage(tab.id, { action: 'GHIDON_TOGGLE', enabled });
+            } catch (_) {}
+        });
+    }
+
+    // ── Settings collapsible toggle ──
+    if (ghidonSettingsToggle) {
+        ghidonSettingsToggle.addEventListener('click', () => {
+            const isOpen = ghidonSettingsBody.style.display !== 'none';
+            ghidonSettingsBody.style.display = isOpen ? 'none' : 'flex';
+            ghidonSettingsToggle.setAttribute('aria-expanded', !isOpen);
+        });
+    }
+
+    // ── Lưu settings ──
+    if (ghidonSaveSettingsBtn) {
+        ghidonSaveSettingsBtn.addEventListener('click', async () => {
+            const settings = {
+                ghidon_sheetWebAppUrl: ghidonWebAppUrl?.value.trim() || '',
+                ghidon_sheetId:        ghidonSheetId?.value.trim()   || '',
+                ghidon_sheetName:      ghidonSheetName?.value.trim() || 'Trang tính1',
+                ghidon_buuTaName:      ghidonBuuTa?.value.trim()    || '',
+                ghidon_scanInterval:   parseInt(ghidonScanInterval?.value, 10) || 50,
+                ghidon_minBarcodeLen:  parseInt(ghidonMinLen?.value, 10) || 8,
+                ghidon_soundEnabled:   ghidonSoundEnabled?.checked !== false,
+                ghidon_duplicateCheck: ghidonDuplicateCheck?.checked !== false,
+            };
+            await ghidonMsg({ action: 'GHIDON_SAVE_SETTINGS', settings });
+            // Visual feedback
+            const origHTML = ghidonSaveSettingsBtn.innerHTML;
+            ghidonSaveSettingsBtn.innerHTML = '✅ Đã lưu!';
+            ghidonSaveSettingsBtn.disabled  = true;
+            setTimeout(() => {
+                ghidonSaveSettingsBtn.innerHTML = origHTML;
+                ghidonSaveSettingsBtn.disabled  = false;
+            }, 2000);
+            // Re-check connection
+            await ghidonCheckConnection();
+        });
+    }
+
+    // ── Test kết nối ──
+    if (ghidonTestConnBtn) {
+        ghidonTestConnBtn.addEventListener('click', async () => {
+            ghidonTestResult.style.display = 'none';
+            ghidonTestConnBtn.disabled = true;
+            const origHTML = ghidonTestConnBtn.innerHTML;
+            ghidonTestConnBtn.innerHTML = '<svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="13" height="13"><path d="M21 12a9 9 0 11-3.36-7.02"/></svg> Đang test...';
+
+            // Save current URL first
+            if (ghidonWebAppUrl?.value.trim()) {
+                await chrome.storage.local.set({ ghidon_sheetWebAppUrl: ghidonWebAppUrl.value.trim() });
+            }
+
+            const result = await ghidonMsg({ action: 'GHIDON_TEST_CONNECTION' });
+
+            ghidonTestResult.style.display = 'block';
+            if (result && result.success) {
+                ghidonTestResult.className   = 'ghidon-test-result is-success';
+                ghidonTestResult.textContent = `✅ Kết nối thành công! ${result.message || ''}`;
+                ghidonSetConnStatus('connected', '🟢 Đã kết nối Google Sheet');
+            } else {
+                ghidonTestResult.className   = 'ghidon-test-result is-error';
+                ghidonTestResult.textContent = `❌ Lỗi: ${result?.error || 'Không kết nối được'}`;
+                ghidonSetConnStatus('disconnected', `🔴 ${result?.error || 'Lỗi kết nối'}`);
+            }
+
+            ghidonTestConnBtn.innerHTML = origHTML;
+            ghidonTestConnBtn.disabled  = false;
+        });
+    }
+
+    // ── Sync pending ──
+    if (ghidonSyncBtn) {
+        ghidonSyncBtn.addEventListener('click', async () => {
+            const origHTML = ghidonSyncBtn.innerHTML;
+            ghidonSyncBtn.innerHTML  = '⏳ Sync...';
+            ghidonSyncBtn.disabled   = true;
+            await ghidonMsg({ action: 'GHIDON_SYNC_PENDING' });
+            setTimeout(async () => {
+                ghidonSyncBtn.innerHTML = origHTML;
+                ghidonSyncBtn.disabled  = false;
+                await ghidonLoadStats();
+            }, 3000);
+        });
+    }
+
+    // ── Reset stats hôm nay ──
+    if (ghidonResetBtn) {
+        ghidonResetBtn.addEventListener('click', async () => {
+            if (!confirm('Reset thống kê hôm nay? (Dữ liệu trên Sheet không bị ảnh hưởng)')) return;
+            await ghidonMsg({ action: 'GHIDON_RESET_TODAY' });
+            await ghidonLoadStats();
+        });
+    }
+
+    // ── Mở Sheet ──
+    if (ghidonOpenSheetBtn) {
+        ghidonOpenSheetBtn.addEventListener('click', async () => {
+            const s = await ghidonMsg({ action: 'GHIDON_GET_SETTINGS' });
+            if (s.ghidon_sheetId) {
+                chrome.tabs.create({ url: `https://docs.google.com/spreadsheets/d/${s.ghidon_sheetId}` });
+            } else {
+                chrome.tabs.create({ url: 'https://docs.google.com/spreadsheets/' });
+            }
+        });
+    }
+
+    // ── Lắng nghe storage changes để refresh stats realtime ──
+    chrome.storage.onChanged.addListener((changes, ns) => {
+        if (ns !== 'local') return;
+        if (changes.__GHIDON_STATS_UPDATED__ || changes.ghidon_todayStats || changes.ghidon_pendingOrders) {
+            ghidonLoadStats();
+        }
+        // Cập nhật trạng thái tài khoản realtime
+        if (changes.ghidon_accountVerified || changes.ghidon_currentUser) {
+            ghidonLoadAccountStatus();
+        }
+    });
+
+    // ── Load & render trạng thái tài khoản ──
+    async function ghidonLoadAccountStatus() {
+        const s = await ghidonMsg({ action: 'GHIDON_GET_SETTINGS' });
+        const verified = s.ghidon_accountVerified;
+        const user     = s.ghidon_currentUser;
+        ghidonRenderAccountStatus(verified, user);
+    }
+
+    function ghidonRenderAccountStatus(verified, user) {
+        if (!ghidonAccountBar) return;
+
+        if (user === null || user === undefined) {
+            // Chưa phát hiện user
+            ghidonAccountBar.className = 'ghidon-account-bar';
+            if (ghidonAccountIcon) ghidonAccountIcon.textContent = '👤';
+            if (ghidonAccountName) ghidonAccountName.textContent = 'Chưa mở trang ViettelPost';
+            if (ghidonWrongAccount) ghidonWrongAccount.style.display = 'none';
+            return;
+        }
+
+        if (verified) {
+            ghidonAccountBar.className = 'ghidon-account-bar is-verified';
+            if (ghidonAccountIcon) ghidonAccountIcon.textContent = '✅';
+            if (ghidonAccountName) ghidonAccountName.textContent = user;
+            if (ghidonWrongAccount) ghidonWrongAccount.style.display = 'none';
+        } else {
+            ghidonAccountBar.className = 'ghidon-account-bar is-invalid';
+            if (ghidonAccountIcon) ghidonAccountIcon.textContent = '⛔';
+            if (ghidonAccountName) ghidonAccountName.textContent = user || 'Không xác định';
+            if (ghidonWrongAccount) ghidonWrongAccount.style.display = 'flex';
+            if (ghidonWrongAccountMsg) {
+                ghidonWrongAccountMsg.textContent =
+                    `Đang đăng nhập: "${user || '?'}" — Cần đăng nhập bằng DƯƠNG THÁI TÂN`;
+            }
+        }
+    }
+
+    // ── Khởi tạo lần đầu ──
+    ghidonInit();
+
 });
